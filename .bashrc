@@ -61,5 +61,5 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
-# move to scratch
-cd /scratch/rdxmig002
+
+
