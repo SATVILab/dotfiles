@@ -1,0 +1,10 @@
+*
+!.Renviron
+!.Rprofile
+!.gitignore
+!.gitconfig
+!.bash_profile
+!.bashrc
+!.bash_logout
+!.vscode/settings.json
+

@@ -1,0 +1,3 @@
+GITHUB_PAT=ghp
+RENV_PATHS_CACHE=/scratch/rdxmig002/.local/R/lib/4.2
+
