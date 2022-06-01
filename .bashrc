@@ -19,6 +19,9 @@ module load software/R-4.2.0
 alias R='R --no-save --no-restore'
 alias r='radian'
 
+# singularity version
+alias sr42='singularity exec $SD/sif/verse_4.2.0.sif R'
+
 # ------------
 # Git-specific
 # ------------
