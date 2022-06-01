@@ -2,3 +2,8 @@ RENV_PATHS_CACHE = "/scratch/${USER}/.local/R/lib/renv"
 RENV_PATHS_PREFIX_AUTO=TRUE
 RENV_PATHS_ROOT = "/scratch/${USER}/.cache/R/renv"
 RENV_PATHS_LIBRARY_ROOT = "/scratch/${USER}/.cache/R/renv"
+PKG_CONFIG_PATH = "/opt/exp_soft/nlopt-2.7.1/lib64/pkgconfig:${PKG_CONFIG_PATH}"
+LD_LIBRARY_PATH = "/opt/exp_soft/nlopt-2.7.1/lib64:${LD_LIBRARY_PATH}"
+R_LIBS = "/scratch/${USER}/.local/R/4.2:${R_LIBS}"
+R_LIBS_USER = /scratch/${USER}/.local/R/4.2
+

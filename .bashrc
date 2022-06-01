@@ -1,19 +1,16 @@
 # ------------
 # General
 # ------------
-export EMAIL=rdxmig002@myuct.ac.za
+export EMAIL=${USER}@myuct.ac.za
 
 # ------------
 # R-specific
 # ------------
 
 # create shortcut to /scratch/rdxmig002
-export SD=/scratch/rdxmig002
+export SD=/scratch/${USER}
 # load version of R you want
 module load software/R-4.2.0
-# tell R where your package library is
-export R_LIBS=/scratch/rdxmig002/.local/R/4.2:$R_LIBS
-export R_LIBS_USER=/scratch/rdxmig002/.local/R/4.2
 
 
 # Ensure that R does not save the workspace
@@ -21,15 +18,6 @@ export R_LIBS_USER=/scratch/rdxmig002/.local/R/4.2
 # after opening
 alias R='R --no-save --no-restore'
 alias r='radian'
-
-# ------------
-# R packages
-# -------------
-
-# nloptr
-# --------------
-export PKG_CONFIG_PATH=/opt/exp_soft/nlopt-2.7.1/lib64/pkgconfig:$PKG_CONFIG_PATH
-export LD_LIBRARY_PATH=/opt/exp_soft/nlopt-2.7.1/lib64:$LD_LIBRARY_PATH
 
 # ------------
 # Git-specific
