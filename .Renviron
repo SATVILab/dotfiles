@@ -1,9 +1,9 @@
-RENV_PATHS_CACHE = "/scratch/${USER}/.local/R/lib/renv"
+RENV_PATHS_CACHE = /scratch/rdxmig002/.local/R/lib/renv
 RENV_PATHS_PREFIX_AUTO=TRUE
-RENV_PATHS_ROOT = "/scratch/${USER}/.cache/R/renv"
-RENV_PATHS_LIBRARY_ROOT = "/scratch/${USER}/.cache/R/renv"
-PKG_CONFIG_PATH = "/opt/exp_soft/nlopt-2.7.1/lib64/pkgconfig:${PKG_CONFIG_PATH}"
-LD_LIBRARY_PATH = "/opt/exp_soft/nlopt-2.7.1/lib64:${LD_LIBRARY_PATH}"
-R_LIBS = "/scratch/${USER}/.local/R/4.2:${R_LIBS}"
-R_LIBS_USER = /scratch/${USER}/.local/R/4.2
+RENV_PATHS_ROOT = /scratch/rdxmig002/.cache/R/renv
+RENV_PATHS_LIBRARY_ROOT = /scratch/rdxmig002/.cache/R/renv
+PKG_CONFIG_PATH = /opt/exp_soft/nlopt-2.7.1/lib64/pkgconfig
+LD_LIBRARY_PATH = /opt/exp_soft/nlopt-2.7.1/lib64:/opt/exp_soft/git/git-2.32/lib:/opt/exp_soft/R-4.2.0/lib64:/opt/exp_soft/openmpi-4.0.1/lib:/opt/exp_soft/gcc-8.2.0/lib:/opt/exp_soft/gcc-8.2.0/lib64
+R_LIBS = /scratch/rdxmig002/.local/R/4.2:/opt/exp_soft/R-4.2.0/lib64
+R_LIBS_USER = /scratch/rdxmig002/.local/R/4.2
 
