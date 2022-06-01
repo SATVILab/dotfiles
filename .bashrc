@@ -12,8 +12,8 @@ export SD=/scratch/rdxmig002
 # load version of R you want
 module load software/R-4.2.0
 # tell R where your package library is
-export R_LIBS=/scratch/rdxmig002/local/R/4.2:$R_LIBS
-export R_LIBS_USER=/scratch/rdxmig002/local/R/4.2
+export R_LIBS=/scratch/rdxmig002/.local/R/4.2:$R_LIBS
+export R_LIBS_USER=/scratch/rdxmig002/.local/R/4.2
 
 
 # Ensure that R does not save the workspace
@@ -61,5 +61,5 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
-
+# move to scratch
 

@@ -1,3 +1,5 @@
-GITHUB_PAT=ghp
-RENV_PATHS_CACHE=/scratch/rdxmig002/.local/R/lib/4.2
-
+GITHUB_PAT=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
+RENV_PATHS_CACHE = "/scratch/${USER}/.local/R/lib/renv"
+RENV_PATHS_PREFIX_AUTO=TRUE
+RENV_PATHS_ROOT = "/scratch/${USER}/.cache/R/renv"
+RENV_PATHS_LIBRARY_ROOT = "/scratch/${USER}/.cache/R/renv"
