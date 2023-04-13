@@ -1,9 +1,0 @@
-[core]
-	editor = vim
-[init]
-	defaultBranch = main
-[user]
-	name = Miguel Rodo
-	email = rdxmig002@myuct.ac.za
-[credential]
-	helper = store
