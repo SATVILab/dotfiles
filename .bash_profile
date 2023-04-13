@@ -1,4 +1,4 @@
-# osf environment variable
-OSF_PAT=bAlQF7nOFeY2svGMKgbsuIzCLi26f51ELCx3GTZKB3OPeqnGuuz33vaRNOIftZd8JqLDz0
-# wakatime
-WAKATIME_API_KEY=waka_e02a20d2-1d15-4a58-be8c-787392a98881
+# .bash_profile
+if [ -r ~/.bashrc ]; then
+  . ~/.bashrc
+fi
