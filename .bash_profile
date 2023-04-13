@@ -1,0 +1,4 @@
+# osf environment variable
+OSF_PAT=ycCCR344bzAfgk4106PvBpAdltdpW5rdzo1Dhtchly9hYvN72V61NMJC3hszqwTfwGiJUZ
+# wakatime
+WAKATIME_API_KEY=waka_6500259e-ea1a-431e-a8a4-ac53f3d52d1c
