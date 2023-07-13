@@ -17,5 +17,5 @@ fi
 # ensure R_LIBS is set and created (so
 # that one never tries to install packages
 # into a singularity/apptainer container)
-R_LIBS=${R_LIBS:=/"/home/$USER/.local/lib/R"}
+R_LIBS=${R_LIBS:="/home/$USER/.local/lib/R"}
 mkdir -p "$R_LIBS"
