@@ -12,11 +12,11 @@ if [ -n "$(env | grep -E "^GITPOD")" ]; then
     RENV_PATHS_LIBRARY_ROOT=${RENV_PATHS_LIBRARY_ROOT:=/workspace/.local/.cache/R/renv}
     RENV_PATHS_LIBRARY=${RENV_PATHS_LIBRARY:=/workspace/.local/.cache/R/renv}
     RENV_PREFIX_AUTO=${RENV_PREFIX_AUTO:=TRUE}
-    RENV_CONFIG_PAK_ENABLED=${RENV_CONFIG_PAK_ENABLED:=TRUE}
 fi
 
 # ensure that radian works
 if [ -n "$(env | grep -E "^GITPOD|^CODESPACE")" ]; then
+  export RENV_CONFIG_PAK_ENABLED=${RENV_CONFIG_PAK_ENABLED:=TRUE}
   if ! [ -e "$HOME/.radian_profile" ]; then touch "$HOME/.radian_profile"; fi
   if [ -z "$(cat "$HOME/.radian_profile" | grep -E 'options\(\s*radian\.editing_mode')" ]; then 
     echo 'options(radian.editing_mode = "vi")' >> "$HOME/.radian_profile"
