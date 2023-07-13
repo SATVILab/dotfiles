@@ -18,10 +18,10 @@ fi
 # ensure that radian works
 if [ -n "$(env | grep -E "^GITPOD|^CODESPACE")" ]; then
   if ! [ -e "$HOME/.radian_profile" ]; then touch "$HOME/.radian_profile"; fi
-  if [ -z $(cat "$HOME/.radian_profile" | grep -E 'options\(\s*radian\.editing_mode') ]; then 
+  if [ -z "$(cat "$HOME/.radian_profile" | grep -E 'options\(\s*radian\.editing_mode')" ]; then 
     echo 'options(radian.editing_mode = "vi")' >> "$HOME/.radian_profile"
   fi
-  if [ -z $(cat "$HOME/.radian_profile" | grep -E 'options\(\s*radian\.auto_match') ]; then 
+  if [ -z "$(cat "$HOME/.radian_profile" | grep -E 'options\(\s*radian\.auto_match')" ]; then 
     echo 'options(radian.auto_match = FALSE)' >> "$HOME/.radian_profile"
   fi
 fi
