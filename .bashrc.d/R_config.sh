@@ -4,7 +4,7 @@ if [ -n $GH_TOKEN ]; then
   export GITHUB_TOKEN=${GITHUB_PAT:-$GH_TOKEN}
 fi
 
-# Save all renv settings to workspace if on GitPod
+# save all R packages to workspace if on GitPod
 if [ -n "$(env | grep -E "^GITPOD")"]; then
     R_LIBS=${R_LIBS:=/"/workspace/.local/lib/R"}
     RENV_PATHS_CACHE=${RENV_PATHS_CACHE:=/workspace/.local/R/lib/renv}
