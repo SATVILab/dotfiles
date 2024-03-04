@@ -4,4 +4,4 @@ PROJR_FIRST_NAME=Miguel
 PROJR_LAST_NAME=Rodo
 PROJR_EMAIL=miguel.rodo@uct.ac.za;rdxmig002@myuct.ac.za
 # renv PAK use
-RENV_CONFIG_PAK_ENABLED=true
+RENV_CONFIG_PAK_ENABLED=false
