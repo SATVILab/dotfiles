@@ -83,3 +83,7 @@ if [[ "$GITHUB_USER" == "MiguelRodo" && "$CODESPACES" == "true" ]]; then
     # Example: Replace this line with any additional script you want to run in Codespaces
     install-jetbrains-font
 fi
+
+if [ -f "$HOME/install-hpc.sh" ]; then
+  rm "$HOME/install-hpc.sh"
+fi
