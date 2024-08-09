@@ -2,7 +2,7 @@
 
 # install-hpc.sh
 # This script sets up the environment on an HPC by copying scripts from the dotfiles repository 
-# to the ~/scripts directory, running the main install.sh script, and optionally copying hidden 
+# to the ~/.local/bin directory, running the main install.sh script, and optionally copying hidden 
 # configuration files (.Renviron, .lintr, .radian_profile) to the home directory based on a flag.
 
 # Parse the command-line options
@@ -19,11 +19,11 @@ while getopts "c" opt; do
   esac
 done
 
-# Step 1: Copy the script files from ~/dotfiles/scripts to ~/scripts
-echo "Copying scripts to ~/scripts..."
-mkdir -p "$HOME/scripts"
-cp -r "$HOME/dotfiles/scripts/"* "$HOME/scripts/"
-echo "Scripts copied to ~/scripts."
+# Step 1: Copy the script files from ~/dotfiles/scripts to ~/.local/bin
+echo "Copying scripts to ~/.local/bin..."
+mkdir -p "$HOME/.local/bin"
+cp -r "$HOME/dotfiles/scripts/"* "$HOME/.local/bin/"
+echo "Scripts copied to ~/.local/bin."
 
 # Step 2: Run the main install.sh script from the dotfiles repository
 echo "Running the main install.sh script..."
