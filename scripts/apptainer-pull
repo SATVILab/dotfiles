@@ -85,6 +85,7 @@ log "  SIF Name: $SIF_NAME"
 log "  Tag: $TAG"
 log "  Base Directory: $base_dir"
 log "  Force: $FORCE"
+log "  SIF File: $SIF_FILE"
 
 # Function to handle errors and log the location of the log file
 error_handler() {

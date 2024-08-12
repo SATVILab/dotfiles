@@ -62,6 +62,7 @@ log "  Directory: $DIRECTORY"
 log "  Custom Command: $CUSTOM_COMMAND"
 log "  Scratch Directory: $SCRATCH_DIR"
 log "  Home Directory: $HOME_DIR"
+log "  Log File: $log_file"
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
