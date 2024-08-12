@@ -75,6 +75,19 @@ log() {
 # Full path for the SIF file
 SIF_FILE="$base_dir/${SIF_NAME,,}"
 
+# Function to handle errors and log the location of the log file
+error_handler() {
+    local err_msg="An error occurred during the script execution. See the log file for details: $log_file"
+    log "$err_msg"
+    echo "$err_msg"
+    echo "To view the log file, run:"
+    echo "cat $log_file"
+    exit 1
+}
+
+# Trap errors to run the error handler
+trap 'error_handler' ERR
+
 # Check if SIF file already exists
 if [ -f "$SIF_FILE" ] && [ "$FORCE" = false ]; then
     log "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite."
@@ -93,17 +106,6 @@ if [ -z "$PASSWORD" ]; then
     exit 1
 fi
 
-# Function to handle errors and log the location of the log file
-error_handler() {
-    log "An error occurred. See the log file for details: $log_file"
-    echo "To view the log file, run:"
-    echo "cat $log_file"
-    exit 1
-}
-
-# Trap errors to run the error handler
-trap 'error_handler' ERR
-
 # Function to build Apptainer image
 build_apptainer() {
     log "Starting Apptainer build process"
@@ -111,8 +113,8 @@ build_apptainer() {
     log "Logging into GitHub Container Registry"
     echo "$PASSWORD" | apptainer registry login -u "$GITHUB_USER" --password-stdin docker://ghcr.io
     
-    local github_user=$(GITHUB_USER,,)
-    local image_name=$(IMAGE_NAME,,)
+    local github_user=$(echo "$GITHUB_USER" | tr '[:upper:]' '[:lower:]')
+    local image_name=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
     log "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$github_user/$image_name:$TAG'"
     apptainer build "$SIF_FILE" "docker://ghcr.io/$github_user/$image_name:$TAG"
     
