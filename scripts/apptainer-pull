@@ -5,7 +5,7 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-r <github_repo>] [-u <github_user>] [-p <password>] [-i <image_name>] [-n <sif_name>] [-t <tag>] [--force]"
-    echo "  -r <github_repo>  : GitHub repository (owner/repo)"
+    echo "  -r <github_repo>  : GitHub repository (repo only; don't specify owner)"
     echo "  -u <github_user>  : GitHub username"
     echo "  -p <password>     : Password or token (optional, defaults to GH_TOKEN env var)"
     echo "  -i <image_name>   : Image name (optional, defaults to basename of the repo, forced to lowercase)"

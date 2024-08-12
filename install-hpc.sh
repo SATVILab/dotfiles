@@ -41,4 +41,6 @@ else
   echo "Skipping copying of hidden configuration files. Use the '-c' flag to copy them."
 fi
 
+chmod 755 "$HOME/.local/bin/*"
+
 echo "HPC setup complete."
