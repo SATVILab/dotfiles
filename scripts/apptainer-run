@@ -4,26 +4,22 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 <sif_file> [-d <directory>] [-c <command>]"
-    echo "  <sif_file>           : Name of the SIF file to run"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c <command>]"
+    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --command <command>     : Custom command to run inside the container (optional, defaults to shell)"
     exit 1
 }
 
-# Check if at least one argument is provided
-if [ "$#" -lt 1 ]; then
-    usage
-fi
-
 # Parse arguments
-SIF_FILE="$1"
+SIF_FILE="(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 shift
 DIRECTORY=""
 CUSTOM_COMMAND=""
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
+        -s|--sif) SIF_FILE="$2"; shift ;;
         -d|--directory) DIRECTORY="$2"; shift ;;
         -c|--command) CUSTOM_COMMAND="$2"; shift ;;
         *) usage ;;
