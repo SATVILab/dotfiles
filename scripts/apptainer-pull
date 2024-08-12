@@ -73,7 +73,7 @@ log() {
 }
 
 # Full path for the SIF file
-SIF_FILE="$base_dir/$SIF_NAME"
+SIF_FILE="$base_dir/${SIF_NAME,,}"
 
 # Check if SIF file already exists
 if [ -f "$SIF_FILE" ] && [ "$FORCE" = false ]; then
@@ -111,8 +111,10 @@ build_apptainer() {
     log "Logging into GitHub Container Registry"
     echo "$PASSWORD" | apptainer registry login -u "$GITHUB_USER" --password-stdin docker://ghcr.io
     
-    log "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$GITHUB_USER/$IMAGE_NAME:$TAG'"
-    apptainer build "$SIF_FILE" "docker://ghcr.io/$GITHUB_USER/$IMAGE_NAME:$TAG"
+    local github_user=$(GITHUB_USER,,)
+    local image_name=$(IMAGE_NAME,,)
+    log "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$github_user/$image_name:$TAG'"
+    apptainer build "$SIF_FILE" "docker://ghcr.io/$github_user/$image_name:$TAG"
     
     log "Apptainer build process completed"
 }
