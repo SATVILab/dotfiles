@@ -11,12 +11,12 @@ usage() {
     exit 1
 }
 
-# Parse arguments
-SIF_FILE="(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
-shift
+# Initialize default values
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CUSTOM_COMMAND=""
 
+# Parse named parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -s|--sif) SIF_FILE="$2"; shift ;;
@@ -45,6 +45,24 @@ else
     HOME_DIR=""
 fi
 
+# Create a log directory and log file
+log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs"
+mkdir -p "$log_dir"
+log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+}
+
+# Log the parsed options
+log "Options:"
+log "  SIF File: $SIF_FILE"
+log "  Directory: $DIRECTORY"
+log "  Custom Command: $CUSTOM_COMMAND"
+log "  Scratch Directory: $SCRATCH_DIR"
+log "  Home Directory: $HOME_DIR"
+
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
     SIF_PATH="$DIRECTORY/$SIF_FILE"
@@ -53,15 +71,30 @@ elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
 elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
     SIF_PATH="$HOME_DIR/$SIF_FILE"
 else
-    echo "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
+    log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
+    echo "To view the log file, run:"
+    echo "cat $log_file"
     exit 1
 fi
 
+# Function to handle errors and log the location of the log file
+error_handler() {
+    log "An error occurred. See the log file for details: $log_file"
+    echo "To view the log file, run:"
+    echo "cat $log_file"
+    exit 1
+}
+
+# Trap errors to run the error handler
+trap 'error_handler' ERR
+
 # Run the Apptainer image with either shell or custom command
 if [ -n "$CUSTOM_COMMAND" ]; then
-    echo "Running Apptainer image with custom command: $CUSTOM_COMMAND from '$SIF_PATH'"
+    log "Running Apptainer image with custom command: $CUSTOM_COMMAND from '$SIF_PATH'"
     apptainer exec "$SIF_PATH" $CUSTOM_COMMAND
 else
-    echo "Running Apptainer image in shell mode from '$SIF_PATH'"
+    log "Running Apptainer image in shell mode from '$SIF_PATH'"
     apptainer shell "$SIF_PATH"
 fi
+
+log "Apptainer run process completed successfully"

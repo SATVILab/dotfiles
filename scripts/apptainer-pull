@@ -75,6 +75,17 @@ log() {
 # Full path for the SIF file
 SIF_FILE="$base_dir/${SIF_NAME,,}"
 
+# echo out all the options used
+log "Options:"
+log "  GitHub User: $GITHUB_USER"
+log "  GitHub Repo: $GITHUB_REPO"
+log "  Password: ***"
+log "  Image Name: $IMAGE_NAME"
+log "  SIF Name: $SIF_NAME"
+log "  Tag: $TAG"
+log "  Base Directory: $base_dir"
+log "  Force: $FORCE"
+
 # Function to handle errors and log the location of the log file
 error_handler() {
     local err_msg="An error occurred during the script execution. See the log file for details: $log_file"
