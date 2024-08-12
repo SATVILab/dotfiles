@@ -64,17 +64,17 @@ fi
 log_dir="$base_dir/logs/$GITHUB_REPO"
 mkdir -p "$log_dir"
 
+# Full path for the SIF file
+SIF_FILE="$base_dir/${SIF_NAME,,}"
+
 # Set up log file with date and time
+# make the direcotry include the sif file name without
 log_file="$log_dir/build_log_$(date '+%Y%m%d_%H%M%S').txt"
 
 # Function to log messages
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
-
-# Full path for the SIF file
-SIF_FILE="$base_dir/${SIF_NAME,,}"
-
 # echo out all the options used
 log "Options:"
 log "  GitHub User: $GITHUB_USER"
