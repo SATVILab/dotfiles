@@ -5,9 +5,9 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 <sif_file> [-d <directory>] [-c <command>]"
-    echo "  <sif_file>      : Name of the SIF file to run"
-    echo "  -d <directory>  : Directory to search for the SIF file (optional)"
-    echo "  -c <command>    : Custom command to run inside the container (optional, defaults to shell)"
+    echo "  <sif_file>           : Name of the SIF file to run"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
+    echo "  -c, --command <command>     : Custom command to run inside the container (optional, defaults to shell)"
     exit 1
 }
 
@@ -24,18 +24,20 @@ CUSTOM_COMMAND=""
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -d) DIRECTORY="$2"; shift ;;
-        -c) CUSTOM_COMMAND="$2"; shift ;;
+        -d|--directory) DIRECTORY="$2"; shift ;;
+        -c|--command) CUSTOM_COMMAND="$2"; shift ;;
         *) usage ;;
     esac
     shift
 done
 
-# Ensure the SIF_FILE ends with .sif
-SIF_FILE="${SIF_FILE%.sif}.sif"
+# Ensure the SIF_FILE ends with .sif and convert to lowercase
+SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
 
 # Determine the base directories
-if [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
+if [ -n "$APPTAINER_CACHE_DIR" ]; then
+    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
+elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
     SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
 else
     SCRATCH_DIR=""
