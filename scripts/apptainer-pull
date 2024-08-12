@@ -4,64 +4,82 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-r <github_repo>] [-u <github_user>] [-p <password>] [-i <image_name>] [-n <sif_name>] [-t <tag>] [--force]"
-    echo "  -r <github_repo>  : GitHub repository (repo only; don't specify owner)"
-    echo "  -u <github_user>  : GitHub username"
-    echo "  -p <password>     : Password or token (optional, defaults to GH_TOKEN env var)"
-    echo "  -i <image_name>   : Image name (optional, defaults to basename of the repo, forced to lowercase)"
-    echo "  -n <sif_name>     : SIF file name (optional, defaults to basename of the repo, forced to lowercase and ending with .sif)"
-    echo "  -t <tag>          : Tag (optional, defaults to 'latest')"
-    echo "  --force           : Force download and overwrite existing SIF file"
+    echo "Usage: $0 -u <github_user> [-r <github_repo>] [-p <password>] [-i <image_name>] [-n <sif_name>] [-t <tag>] [-b <base_dir>] [-f]"
+    echo "  -u, --user <github_user>   : GitHub username (required)"
+    echo "  -r, --repo <github_repo>   : GitHub repository (optional, defaults to the current directory name)"
+    echo "  -p, --password <password>  : Password or token (optional, defaults to GH_TOKEN, GITHUB_TOKEN, or GITHUB_PAT environment variables)"
+    echo "  -i, --image <image_name>   : Image name (optional, defaults to the repository name, forced to lowercase)"
+    echo "  -n, --sif <sif_name>       : SIF file name (optional, defaults to the repository name, forced to lowercase and ending with .sif)"
+    echo "  -t, --tag <tag>            : Tag (optional, defaults to 'latest')"
+    echo "  -b, --base_dir <base_dir>  : Base directory for storing the SIF file (optional, defaults to \$APPTAINER_CACHE_DIR if set)"
+    echo "  -f, --force                : Force download and overwrite existing SIF file"
     exit 1
 }
 
 # Initialize default values
 TAG="latest"
 FORCE=false
+GITHUB_REPO=$(basename "$PWD")
 
 # Parse named parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -r) GITHUB_REPO="$2"; shift ;;
-        -u) GITHUB_USER="$2"; shift ;;
-        -p) PASSWORD="$2"; shift ;;
-        -i) IMAGE_NAME="$2"; shift ;;
-        -n) SIF_NAME="$2"; shift ;;
-        -t) TAG="$2"; shift ;;
-        --force) FORCE=true ;;
+        -u|--user) GITHUB_USER="$2"; shift ;;
+        -r|--repo) GITHUB_REPO="$2"; shift ;;
+        -p|--password) PASSWORD="$2"; shift ;;
+        -i|--image) IMAGE_NAME="$2"; shift ;;
+        -n|--sif) SIF_NAME="$2"; shift ;;
+        -t|--tag) TAG="$2"; shift ;;
+        -b|--base_dir) base_dir="$2"; shift ;;
+        -f|--force) FORCE=true ;;
         *) usage ;;
     esac
     shift
 done
 
 # Check mandatory parameters
-if [ -z "$GITHUB_REPO" ] || [ -z "$GITHUB_USER" ]; then
+if [ -z "$GITHUB_USER" ]; then
+    echo "Error: GitHub username is required"
     usage
+    exit 1
 fi
 
 # Set default values if not provided
 IMAGE_NAME=${IMAGE_NAME:-$(basename "$GITHUB_REPO" | tr '[:upper:]' '[:lower:]')}
 SIF_NAME=${SIF_NAME:-$(basename "$GITHUB_REPO" | tr '[:upper:]' '[:lower:]')}
-
-# Ensure the SIF_NAME ends with .sif
 SIF_NAME="${SIF_NAME%.sif}.sif"
 
-# Determine the base directory based on the availability of /scratch/$USER
-if [ -d "/scratch/$USER" ]; then
-    base_dir="/scratch/$USER/.local/share/apptainer/sif"
-else
-    base_dir="$HOME/.local/share/apptainer/sif"
+# Determine the base directory if not provided
+if [ -z "$base_dir" ]; then
+    if [ -n "$APPTAINER_CACHE_DIR" ]; then
+        base_dir="$APPTAINER_CACHE_DIR"
+    elif [ -d "/scratch/$USER" ]; then
+        base_dir="/scratch/$USER/.local/share/apptainer/sif"
+    else
+        base_dir="$HOME/.local/share/apptainer/sif"
+    fi
 fi
 
-# Create the base directory if it doesn't exist
-mkdir -p "$base_dir"
+# Create the base directory and log directory if they don't exist
+log_dir="$base_dir/logs/$GITHUB_REPO"
+mkdir -p "$log_dir"
+
+# Set up log file with date and time
+log_file="$log_dir/build_log_$(date '+%Y%m%d_%H%M%S').txt"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+}
 
 # Full path for the SIF file
 SIF_FILE="$base_dir/$SIF_NAME"
 
 # Check if SIF file already exists
 if [ -f "$SIF_FILE" ] && [ "$FORCE" = false ]; then
-    echo "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite."
+    log "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite."
+    echo "To view the log file, run:"
+    echo "cat $log_file"
     exit 1
 fi
 
@@ -69,24 +87,37 @@ fi
 PASSWORD=${PASSWORD:-$GH_TOKEN}
 
 if [ -z "$PASSWORD" ]; then
-    echo "Error: No password provided and GH_TOKEN is not set."
+    log "Error: No password provided and GH_TOKEN is not set."
+    echo "To view the log file, run:"
+    echo "cat $log_file"
     exit 1
 fi
 
+# Function to handle errors and log the location of the log file
+error_handler() {
+    log "An error occurred. See the log file for details: $log_file"
+    echo "To view the log file, run:"
+    echo "cat $log_file"
+    exit 1
+}
+
+# Trap errors to run the error handler
+trap 'error_handler' ERR
+
 # Function to build Apptainer image
 build_apptainer() {
-    echo "Starting Apptainer build process"
+    log "Starting Apptainer build process"
     
-    echo "Logging into GitHub Container Registry"
+    log "Logging into GitHub Container Registry"
     echo "$PASSWORD" | apptainer registry login -u "$GITHUB_USER" --password-stdin docker://ghcr.io
     
-    echo "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$GITHUB_REPO/$IMAGE_NAME:$TAG'"
-    apptainer build "$SIF_FILE" "docker://ghcr.io/$GITHUB_REPO/$IMAGE_NAME:$TAG"
+    log "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$GITHUB_USER/$IMAGE_NAME:$TAG'"
+    apptainer build "$SIF_FILE" "docker://ghcr.io/$GITHUB_USER/$IMAGE_NAME:$TAG"
     
-    echo "Apptainer build process completed"
+    log "Apptainer build process completed"
 }
 
 # Run the build function
 build_apptainer
 
-echo "Apptainer image '$SIF_FILE' created successfully"
+log "Apptainer image '$SIF_FILE' created successfully"
