@@ -87,3 +87,5 @@ fi
 if [ -f "$HOME/install-hpc.sh" ]; then
   rm "$HOME/install-hpc.sh"
 fi
+
+chmod 755 "$HOME/.local/bin/*"
