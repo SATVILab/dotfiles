@@ -46,7 +46,8 @@ else
 fi
 
 # Create a log directory and log file
-log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs"
+SIF_FILE_BASENAME=$(basename "$SIF_FILE")
+log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
 mkdir -p "$log_dir"
 log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
 
