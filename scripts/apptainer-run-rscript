@@ -8,6 +8,10 @@ usage() {
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  <R code>                    : R code to run inside the container with Rscript -e (required)"
+    echo ""
+    echo "Note: If your R code includes special characters like parentheses or quotes, ensure you wrap the command in double quotes:"
+    echo "  Example: $0 -s mycontainer \"print('abc')\""
+    echo "  And not: $0 -s mycontainer print('abc')"
     exit 1
 }
 
@@ -31,6 +35,13 @@ done
 if [ -z "$CUSTOM_COMMAND" ]; then
     echo "Error: No R command provided."
     usage
+    exit 1
+fi
+
+# Check for common syntax issues
+if [[ "$CUSTOM_COMMAND" =~ [^\"]*\([^)]* ]]; then
+    echo "Error: It looks like you have unescaped parentheses or other special characters in your command."
+    echo "Please wrap your command in double quotes like this: \"print('abc')\""
     exit 1
 fi
 
