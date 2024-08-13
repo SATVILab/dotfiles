@@ -93,7 +93,7 @@ trap 'error_handler' ERR
 # Run the Apptainer image with either shell or custom command
 if [ -n "$CUSTOM_COMMAND" ]; then
     log "Running Apptainer image with custom command: $CUSTOM_COMMAND from '$SIF_PATH'"
-    apptainer exec "$SIF_PATH" $CUSTOM_COMMAND
+    apptainer exec "$SIF_PATH" bash -c "$CUSTOM_COMMAND"
 else
     log "Running Apptainer image in shell mode from '$SIF_PATH'"
     apptainer shell "$SIF_PATH"
