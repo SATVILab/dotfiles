@@ -1,7 +1,7 @@
 # projr environment variables
-PROJR_GITHUB_USER_NAME=MiguelRodo;SATVILab
-PROJR_FIRST_NAME=Miguel
-PROJR_LAST_NAME=Rodo
-PROJR_EMAIL=miguel.rodo@uct.ac.za;rdxmig002@myuct.ac.za
+PROJR_GITHUB_USER_NAME=
+PROJR_FIRST_NAME=
+PROJR_LAST_NAME=
+PROJR_EMAIL=
 # renv PAK use
 RENV_CONFIG_PAK_ENABLED=false
