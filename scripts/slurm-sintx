@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
-sintx --ntasks="$1" --nodes=1
+ntasks="${1:-2}"
+
+sintx --ntasks="$ntasks" --nodes=1
