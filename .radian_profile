@@ -1,1 +1,2 @@
+options(radian.editing_mode = "vi")
 options(radian.auto_match = FALSE)
