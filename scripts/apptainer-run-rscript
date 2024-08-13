@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Function to display usage
+usage() {
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c <command>]"
+    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
+    echo "  -c, --command <command>     : R code to run inside the container with Rscript -e (required)"
+    exit 1
+}
+
+# Initialize default values
+SIF_FILE=""
+DIRECTORY=""
+CUSTOM_COMMAND=""
+
+# Parse named parameters
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -s|--sif) SIF_FILE="$2"; shift ;;
+        -d|--directory) DIRECTORY="$2"; shift ;;
+        -c|--command) CUSTOM_COMMAND="$2"; shift ;;
+        *) usage ;;
+    esac
+    shift
+done
+
+# Ensure the custom command is provided
+if [ -z "$CUSTOM_COMMAND" ]; then
+    echo "Error: No R command provided."
+    usage
+    exit 1
+fi
+
+# Escape any double quotes in the custom command
+ESCAPED_COMMAND=$(echo "$CUSTOM_COMMAND" | sed 's/"/\\"/g')
+
+# Build the full command to pass to apptainer-run
+FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
+
+# Call apptainer-run with the prepared command, passing through SIF_FILE and DIRECTORY without changes
+apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -c "$FULL_COMMAND"
