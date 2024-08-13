@@ -9,10 +9,9 @@ usage() {
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  <R code>                    : R code to run inside the container with Rscript -e (required)"
     echo ""
-    echo "Note: If your R code includes special characters like parentheses or quotes, ensure you wrap the command in double quotes:"
-    echo "  Example: $0 -s mycontainer \"print('abc')\""
-    echo "  And not: $0 -s mycontainer print('abc')"
-    exit 1
+    echo "Example: $0 -s mycontainer \"print('abc')\""
+    echo "Note: Ensure your R code is wrapped in quotes if it contains special characters."
+    exit 0
 }
 
 # Initialize default values
@@ -25,6 +24,7 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
+        -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND="$@"; break ;;
         -*|--*) usage ;;
         *) CUSTOM_COMMAND="$@"; break ;;

@@ -8,7 +8,10 @@ usage() {
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
-    exit 1
+    echo ""
+    echo "Example: $0 -s mycontainer echo \"Hello, World!\""
+    echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
+    exit 0
 }
 
 # Initialize default values
@@ -21,6 +24,7 @@ while [[ "$#" -gt 0 ]]; do
     case $1 in
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
+        -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND="$@"; break ;;
         -*|--*) usage ;;
         *) CUSTOM_COMMAND="$@"; break ;;

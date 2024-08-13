@@ -32,6 +32,7 @@ while [[ "$#" -gt 0 ]]; do
         -t|--tag) TAG="$2"; shift ;;
         -b|--base_dir) base_dir="$2"; shift ;;
         -f|--force) FORCE=true ;;
+        -h|--help) usage ;;
         *) usage ;;
     esac
     shift
