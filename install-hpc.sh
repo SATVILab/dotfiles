@@ -19,6 +19,8 @@ while getopts "c" opt; do
   esac
 done
 
+dos2unix scripts/*
+
 # Step 1: Copy the script files from ~/dotfiles/scripts to ~/.local/bin
 echo "Copying scripts to ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"

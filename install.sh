@@ -69,6 +69,8 @@ config_home_bin() {
   echo "Setup complete. You can now place your scripts in '~/bin' or '~/.local/bin' directories."
 }
 
+dos2unix scripts/*
+
 # Execute the functions defined above
 config_home_bin
 clone_repo
