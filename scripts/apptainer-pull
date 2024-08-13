@@ -12,7 +12,7 @@ usage() {
     echo "  -n, --sif <sif_name>       : SIF file name (optional, defaults to the repository name, forced to lowercase and ending with .sif)"
     echo "  -t, --tag <tag>            : Tag (optional, defaults to 'latest')"
     echo "  -b, --base_dir <base_dir>  : Base directory for storing the SIF file (optional, defaults to \$APPTAINER_CACHE_DIR if set)"
-    echo "  -f, --force                : Force download and overwrite existing SIF file"
+    echo "  -f, --force                : Force download and overwrite existing SIF file (defaults to false)"
     exit 1
 }
 
@@ -128,7 +128,7 @@ build_apptainer() {
     local github_user=$(echo "$GITHUB_USER" | tr '[:upper:]' '[:lower:]')
     local image_name=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
     log "Building Apptainer image '$SIF_FILE' from Docker image 'docker://ghcr.io/$github_user/$image_name:$TAG'"
-    apptainer build "$SIF_FILE" "docker://ghcr.io/$github_user/$image_name:$TAG"
+    apptainer build --force "$SIF_FILE" "docker://ghcr.io/$github_user/$image_name:$TAG"
     
     log "Apptainer build process completed"
 }
