@@ -4,10 +4,10 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c <command>]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] <R code>"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  -c, --command <command>     : R code to run inside the container with Rscript -e (required)"
+    echo "  <R code>                    : R code to run inside the container with Rscript -e (required)"
     exit 1
 }
 
@@ -16,15 +16,15 @@ SIF_FILE=""
 DIRECTORY=""
 CUSTOM_COMMAND=""
 
-# Parse named parameters
+# Parse named parameters and command
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -s|--sif) SIF_FILE="$2"; shift ;;
-        -d|--directory) DIRECTORY="$2"; shift ;;
-        -c|--command) CUSTOM_COMMAND="$2"; shift ;;
-        *) usage ;;
+        -s|--sif) SIF_FILE="$2"; shift 2 ;;
+        -d|--directory) DIRECTORY="$2"; shift 2 ;;
+        --) shift; CUSTOM_COMMAND="$@"; break ;;
+        -*|--*) usage ;;
+        *) CUSTOM_COMMAND="$@"; break ;;
     esac
-    shift
 done
 
 # Ensure the custom command is provided
@@ -41,4 +41,4 @@ ESCAPED_COMMAND=$(echo "$CUSTOM_COMMAND" | sed 's/"/\\"/g')
 FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
 
 # Call apptainer-run with the prepared command, passing through SIF_FILE and DIRECTORY without changes
-apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -c "$FULL_COMMAND"
+apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- "$FULL_COMMAND"
