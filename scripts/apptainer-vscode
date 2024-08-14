@@ -96,7 +96,7 @@ fi
 # Prepare the command for running inside the container
 COMMANDS=""
 COMMANDS+='if [ -f /etc/profile ]; then source /etc/profile; fi; '
-COMMANDS+='if [ -f "$HOME/.bashrc" ]; then source "$HOME/.bashrc"; fi; '
+COMMANDS+='if [ -f '"$HOME"'/.bashrc ]; then source '"$HOME"'/.bashrc; fi; '
 
 # Clean up existing tunnels if requested
 if [ "$CLEAN" = true ]; then
