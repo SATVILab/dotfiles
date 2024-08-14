@@ -94,7 +94,7 @@ if ! apptainer-exists ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"};
 fi
 
 # Prepare the command for running inside the container
-COMMANDS="source /etc/profile; source $HOME/.bashrc; "
+COMMANDS="source /etc/profile; source \"$HOME/.bashrc\"; "
 
 # Clean up existing tunnels if requested
 if [ "$CLEAN" = true ]; then
