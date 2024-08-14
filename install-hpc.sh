@@ -19,7 +19,8 @@ while getopts "c" opt; do
   esac
 done
 
-dos2unix scripts/*
+dos2unix "$HOME/dotfiles"/scripts/*
+chmod 755 "$HOME/dotfiles"/scripts/*
 
 # Step 1: Copy the script files from ~/dotfiles/scripts to ~/.local/bin
 echo "Copying scripts to ~/.local/bin..."
@@ -42,7 +43,5 @@ if [ "$COPY_HIDDEN" = true ]; then
 else
   echo "Skipping copying of hidden configuration files. Use the '-c' flag to copy them."
 fi
-
-chmod -R 755 "$HOME/.local/bin/"
 
 echo "HPC setup complete."
