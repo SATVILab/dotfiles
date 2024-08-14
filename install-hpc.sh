@@ -19,8 +19,14 @@ while getopts "c" opt; do
   esac
 done
 
-dos2unix "$HOME/dotfiles"/scripts/*
-chmod 755 "$HOME/dotfiles"/scripts/*
+# Convert line endings for regular files only
+if [ -d "$HOME/dotfiles/scripts" ]; then
+  echo "Converting line endings and forcing executability on scripts"
+  find "$HOME/dotfiles/scripts" -type f -exec dos2unix {} +
+  chmod 755 "$HOME/dotfiles/scripts"/*
+else
+  echo "$HOME/dotfiles/scripts not found"
+fi
 
 # Step 1: Copy the script files from ~/dotfiles/scripts to ~/.local/bin
 echo "Copying scripts to ~/.local/bin..."
