@@ -94,15 +94,17 @@ if ! apptainer-exists ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"};
 fi
 
 # Prepare the command for running inside the container
-COMMANDS="source /etc/profile; source \"$HOME/.bashrc\"; "
+COMMANDS="source /etc/profile && source \"$HOME/.bashrc\""
 
 # Clean up existing tunnels if requested
 if [ "$CLEAN" = true ]; then
-    COMMANDS+="code tunnel kill; sleep 2; code tunnel prune; sleep 2; code tunnel unregister; sleep 2; "
+    COMMANDS+=" && (code tunnel kill || true) && sleep 2"
+    COMMANDS+=" && (code tunnel prune || true) && sleep 2"
+    COMMANDS+=" && (code tunnel unregister || true) && sleep 2"
 fi
 
 # Add the command to start VS Code tunnel
-COMMANDS+="/usr/local/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
+COMMANDS+=" && /usr/local/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
