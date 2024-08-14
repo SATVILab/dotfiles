@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Function to display usage
+usage() {
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-data-dir <path>] [<command> ...]"
+    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
+    echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
+    echo "  --cli-data-dir <path>       : Path to the CLI data directory (optional; defaults to /scratch/\$USER/.local/share/Code if it exists, otherwise \$HOME/.local/share/Code)"
+    echo ""
+    echo "Example: $0 -s mycontainer --clean --cli-data-dir /custom/path"
+    echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
+    exit 0
+}
+
+# Initialize default values
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+DIRECTORY=""
+CLEAN=false
+CLI_DATA_DIR=""
+CUSTOM_COMMAND=""
+
+# Parse named parameters and command
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -s|--sif) SIF_FILE="$2"; shift 2 ;;
+        -d|--directory) DIRECTORY="$2"; shift 2 ;;
+        -c|--clean) CLEAN=true; shift ;;
+        --cli-data-dir) CLI_DATA_DIR="$2"; shift 2 ;;
+        -h|--help) usage ;;
+        --) shift; CUSTOM_COMMAND="$@"; break ;;
+        -*|--*) usage ;;
+        *) CUSTOM_COMMAND="$@"; break ;;
+    esac
+done
+
+# Ensure the SIF_FILE ends with .sif and convert to lowercase
+SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
+
+# Determine the base directories
+if [ -n "$APPTAINER_CACHE_DIR" ]; then
+    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
+elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
+    SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
+else
+    SCRATCH_DIR=""
+fi
+
+if [ -d "$HOME/.local/share/apptainer/sif" ]; then
+    HOME_DIR="$HOME/.local/share/apptainer/sif"
+else
+    HOME_DIR=""
+fi
+
+# Determine the CLI data directory
+if [ -z "$CLI_DATA_DIR" ]; then
+    if [ -n "$VSCODE_CLI_DATA_DIR" ]; then
+        CLI_DATA_DIR="$VSCODE_CLI_DATA_DIR"
+    elif [ -d "/scratch/$USER" ]; then
+        CLI_DATA_DIR="/scratch/$USER/.local/share/Code"
+    else
+        CLI_DATA_DIR="$HOME/.local/share/Code"
+    fi
+fi
+
+# Create a log directory and log file
+SIF_FILE_BASENAME=$(basename "$SIF_FILE")
+log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
+mkdir -p "$log_dir"
+log_file="$log_dir/vscode_log_$(date '+%Y%m%d_%H%M%S').txt"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+}
+
+# Log the parsed options
+log "Options:"
+log "  SIF File: $SIF_FILE"
+log "  Directory: $DIRECTORY"
+log "  Clean: $CLEAN"
+log "  CLI Data Directory: $CLI_DATA_DIR"
+log "  Scratch Directory: $SCRATCH_DIR"
+log "  Home Directory: $HOME_DIR"
+log "  Log File: $log_file"
+
+# Check if the SIF file exists
+if ! apptainer-exists ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"}; then
+    log "Error: SIF file '$SIF_FILE' not found."
+    echo "Error: SIF file '$SIF_FILE' not found. Use 'apptainer-pull' to pull the SIF file. If you want a container that can run R and VS Code, use the repository 'CompTemplate' and user 'SATVILab'."
+    exit 1
+fi
+
+# Clean up existing tunnels if requested
+if [ "$CLEAN" = true ]; then
+    log "Starting clean..."
+    code tunnel kill
+    sleep 2
+    code tunnel prune
+    sleep 2
+    code tunnel unregister
+    sleep 2
+fi
+
+# Run VS Code tunnel
+log "Starting VS Code tunnel..."
+code tunnel --accept-server-license-terms --cli-data-dir "$CLI_DATA_DIR"
+
+log "VS Code tunnel started successfully"
