@@ -46,10 +46,31 @@ jobs:
           git remote add upstream https://github.com/SATVILab/dotfiles.git
           git fetch upstream main
 
-      - name: Attempt to Merge with Upstream
+      - name: Merge Upstream Changes
+
         run: |
+          git checkout -b merged-changes-satvilab origin/main
           echo "Attempting to merge 'upstream/main' into 'merged-changes-satvilab'"
+          
+          # Save the current state
+          git diff origin/main > /tmp/before_merge.diff
+
+          # Perform the merge
           git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt
+
+          # Check for differences after merge
+          git diff origin/main > /tmp/after_merge.diff
+
+      - name: Check Merge Status
+        run: |
+          # Compare the diff files
+          if [ -s /tmp/after_merge.diff ]; then
+            echo "Merge introduced changes."
+            echo "MERGE_STATUS=changed" >> $GITHUB_ENV
+          else
+            echo "No changes introduced by merge."
+            echo "MERGE_STATUS=unchanged" >> $GITHUB_ENV
+          fi
 
       - name: Handle Merge Conflicts
         run: |
