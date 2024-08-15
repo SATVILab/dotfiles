@@ -90,7 +90,6 @@ jobs:
             echo "Pushing merged branch 'merged-changes-satvilab' to fork"
             git push --force origin merged-changes-satvilab
           elif [ "$MERGE_STATUS" == "failure" ]; then
-            git checkout -b unmerged-changes-satvilab upstream/main
             git push --force origin unmerged-changes-satvilab
           else
             echo "No changes to push"
