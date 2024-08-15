@@ -35,6 +35,7 @@ jobs:
           fi
 
       - name: Create Pull Request
+        if: env.COMMIT_PUSHED == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
