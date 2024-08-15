@@ -57,7 +57,8 @@ jobs:
           else
             echo "Differences detected."
             echo "NO_DIFF=false" >> $GITHUB_ENV
-      
+          fi
+
       - name: Create Pull Request
         if: env.NO_DIFF == 'false'
         uses: peter-evans/create-pull-request@v6
@@ -67,4 +68,4 @@ jobs:
           title: "Sync with Upstream"
           body: "This PR syncs your fork with the upstream repository."
           base: "main"  # Base branch is the main branch of your fork
-        
+
