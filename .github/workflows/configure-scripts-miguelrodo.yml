@@ -74,7 +74,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
         run: |
-          gh auth login --with-token <<< "${GH_TOKEN}"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head merged-changes-satvilab \
