@@ -1,0 +1,55 @@
+name: Update Fork
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Schedule to run every Sunday at midnight
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  updateFork:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Fork Repository
+        uses: actions/checkout@v4
+        with:
+          repository: MiguelRodo/dotfiles  # Check out your fork repository
+
+      - name: Add Upstream Repository
+        run: |
+          git remote add upstream https://github.com/SATVILab/dotfiles.git  # Add the upstream repository
+          git fetch upstream main:satvilab-main  # Fetch the upstream main branch
+
+      - name: Create New Branch for Upstream Changes
+        run: |
+          git checkout -b satvilab-changes  # Create a new branch for the upstream changes
+          git merge -X theirs satvilab-main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt
+
+      - name: Commit Changes
+        if: success()
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Merge upstream changes and resolve conflicts favoring upstream"  # Commit the merged changes
+
+      - name: Check for Merge Conflicts
+        run: |
+          if [ -f merge_status.txt ]; then
+            echo "Merge conflicts detected, please resolve manually."
+            exit 1
+          fi
+
+      - name: Push the New Branch to Fork
+        if: success()
+        run: |
+          git push origin satvilab-changes  # Push the new branch with the merged changes to your fork
+
+      - name: Create Pull Request
+        if: success()
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT secret
+          branch: "satvilab-changes"  # The new branch created with merged changes
+          title: "Sync with Upstream"
+          body: "This PR syncs your fork with the upstream repository."
+          base: "main"  # Base branch is the main branch of your fork
