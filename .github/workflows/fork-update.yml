@@ -56,7 +56,7 @@ jobs:
           # Perform the merge
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
-          git merge -X theirs upstream/main -m "Merged upstream changes, favouring upstream in case of conflicts" > /tmp/merge_output.txt 2>&1 || echo "Automatic merge failed, manual intervention required!" > /tmp/merge_status.txt
+          git merge -X theirs upstream/main --allow-unrelated-histories -m "Merged upstream changes, favouring upstream in case of conflicts" > /tmp/merge_output.txt 2>&1 || echo "Automatic merge failed, manual intervention required!" > /tmp/merge_status.txt
 
           # Check for differences after merge
           git diff main > /tmp/after_merge.diff
