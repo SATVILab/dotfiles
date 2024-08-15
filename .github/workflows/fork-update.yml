@@ -46,6 +46,7 @@ jobs:
           echo "Adding upstream repository and fetching 'main' branch"
           git remote add upstream https://github.com/SATVILab/dotfiles.git
           git fetch upstream main
+          echo "Trigger change"
 
       - name: Merge Upstream Changes
         run: |
