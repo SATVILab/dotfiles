@@ -3,6 +3,9 @@ name: Update Fork
 on:
   schedule:
     - cron: '0 0 * * 0'  # Schedule to run every Sunday at midnight
+  push:
+    branch:
+      - main
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
@@ -34,10 +37,12 @@ jobs:
             echo "Creating branch for manual merge."
             git checkout -b satvilab-changes-unmerged upstream/main  # Create a new branch 'satvilab-changes-unmerged' from the upstream's main branch
             git push origin satvilab-changes-unmerged  # Push this new branch to your fork
+            echo "MERGE_STATUS=manual" >> $GITHUB_ENV
+          else
+            echo "MERGE_STATUS=success" >> $GITHUB_ENV
           fi
 
       - name: Commit Changes
-        if: success()
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
@@ -45,7 +50,6 @@ jobs:
           git commit -m "Merge upstream changes and resolve conflicts favoring upstream" || echo "No changes to commit"
 
       - name: Push the Merged Branch to Fork
-        if: success()
         run: |
           git push --force origin merged-changes-satvilab  # Push the merged branch to your fork
 
@@ -53,16 +57,15 @@ jobs:
         run: |
           git fetch origin main
           if git diff --exit-code main..HEAD; then
-            echo "No differences between branches."
             echo "NO_DIFF=true" >> $GITHUB_ENV
           else
-            echo "Differences detected."
             echo "NO_DIFF=false" >> $GITHUB_ENV
           fi
 
       - name: Create Pull Request for Successful Merge
-        if: env.NO_DIFF == 'false' && ![ -f merge_status.txt ]
+        if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'success' }}
         run: |
+          echo "Creating PR for successful merge"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head merged-changes-satvilab \
@@ -75,8 +78,9 @@ jobs:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
 
       - name: Create Pull Request for Manual Merge
-        if: env.NO_DIFF == 'false' && [ -f merge_status.txt ]
+        if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'manual' }}
         run: |
+          echo "Creating PR for unsuccessful merge"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head satvilab-changes-unmerged \
