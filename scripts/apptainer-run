@@ -97,6 +97,9 @@ trap 'error_handler' ERR
 # Quote the entire command to pass to bash -c
 CUSTOM_COMMAND=$(printf "%q" "$CUSTOM_COMMAND")
 
+# Add double quotes to ensure proper handling
+CUSTOM_COMMAND="\"$CUSTOM_COMMAND\""
+
 # Run the Apptainer image with either shell or custom command
 if [ -n "$CUSTOM_COMMAND" ]; then
     log "Running Apptainer image with custom command: $CUSTOM_COMMAND from '$SIF_PATH'"
