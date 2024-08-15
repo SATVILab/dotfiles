@@ -35,11 +35,16 @@ jobs:
           fi
 
       - name: Create Pull Request
+        if: env.COMMIT_PUSHED == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Configure scripts"
           branch: "configure-scripts-branch"
+          push-to-fork: "SATVILab/dotfiles"
           base: "main"
           title: "Automated Pull Request to Configure Scripts"
           body: "This PR is automatically created by GitHub Actions to configure scripts."
+          head: "SATVILab:configure-scripts-branch"
+          base: "main"
+          fork: "MiguelRodo/dotfiles"
