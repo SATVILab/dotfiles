@@ -71,7 +71,10 @@ jobs:
 
       - name: Create Pull Request Using gh CLI
         if: env.NO_DIFF == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
         run: |
+          gh auth login --with-token <<< "${GH_TOKEN}"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head merged-changes-satvilab \
@@ -80,6 +83,3 @@ jobs:
             --body "This PR syncs your fork with the upstream repository." \
             --label "sync" \
             --assignee @me
-        with:
-          env: 
-            GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
