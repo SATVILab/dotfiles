@@ -54,7 +54,9 @@ jobs:
           git diff main > /tmp/before_merge.diff
 
           # Perform the merge
-          git merge -X theirs upstream/main -m "Merged upstream changes, favouring upstream in case of conflicts" || echo "Automatic merge failed, manual intervention required!" > merge_status.txt
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git merge -X theirs upstream/main -m "Merged upstream changes, favouring upstream in case of conflicts" || echo "Automatic merge failed, manual intervention required!" > /tmp/merge_status.txt
 
           # Check for differences after merge
           git diff main > /tmp/after_merge.diff
@@ -64,84 +66,63 @@ jobs:
           # Compare the diff files
           if [ -s /tmp/after_merge.diff ]; then
             echo "Merge introduced changes."
-            echo "MERGE_STATUS=changed" >> $GITHUB_ENV
+            echo "MERGE_CHANGE=yes" >> $GITHUB_ENV
           else
             echo "No changes introduced by merge."
-            echo "MERGE_STATUS=unchanged" >> $GITHUB_ENV
+            echo "MERGE_CHANGE=no" >> $GITHUB_ENV
           fi
 
       - name: Handle Merge Conflicts
         run: |
-          if [ -f merge_status.txt ]; then
+          if [ -f /tmp/merge_status.txt ]; then
             echo "Merge conflicts detected. Creating branch for manual merge."
             git checkout -b unmerged-changes-satvilab upstream/main
             git push origin unmerged-changes-satvilab
-            echo "MERGE_STATUS=manual" >> $GITHUB_ENV
+            echo "MERGE_STATUS=failure" >> $GITHUB_ENV
           else
             echo "Merge successful."
             echo "MERGE_STATUS=success" >> $GITHUB_ENV
           fi
 
-      - name: Commit Changes
+      - name: Push the Branch to Fork
         run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add .
-          git commit -m "Merge upstream changes and resolve conflicts favoring upstream" || echo "No changes to commit"
-
-      - name: Push the Merged Branch to Fork
-        run: |
-          echo "Pushing merged branch 'merged-changes-satvilab' to fork"
-          git push --force origin merged-changes-satvilab
-
-      - name: Check for Differences
-        run: |
-          echo "Checking for differences between 'main' and 'HEAD'"
-          git fetch origin main
-          echo "Running git diff main..HEAD"
-          git diff main..HEAD  # Show the differences
-          if git diff --exit-code main..HEAD; then
-            echo "NO_DIFF=true" >> $GITHUB_ENV
+          if [ "$MERGE_STATUS" == "success" ] && [ "$MERGE_CHANGE" == "yes" ]; then
+            echo "Pushing merged branch 'merged-changes-satvilab' to fork"
+            git push --force origin merged-changes-satvilab
+          elif [ "$MERGE_STATUS" == "failure" ]; then
+            git checkout -b unmerged-changes-satvilab upstream/main
+            git push --force origin unmerged-changes-satvilab
           else
-            echo "NO_DIFF=false" >> $GITHUB_ENV
+            echo "No changes to push"
           fi
+        env:
+          MERGE_CHANGE: ${{ env.MERGE_CHANGE }}
+          MERGE_STATUS: ${{ env.MERGE_STATUS }}
 
       - name: Create Pull Request for Successful Merge
-        if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'success' }}
+        if: ${{ env.MERGE_STATUS == 'success' && env.MERGE_CHANGE == 'yes' }}
         run: |
           echo "Creating PR for successful merge"
-          echo "Checking for differences using 'git rev-list'"
-          git rev-list --left-right --count main...merged-changes-satvilab  # Show the rev-list differences
-          if [ "$(git rev-list --count main..merged-changes-satvilab)" -eq 0 ]; then
-            echo "No differences found, skipping PR creation."
-          else
-            gh pr create \
-              --repo MiguelRodo/dotfiles \
-              --head merged-changes-satvilab \
-              --base main \
-              --title "Sync with Upstream" \
-              --body "This PR syncs your fork with the upstream repository." \
-              --assignee @me
-          fi
+          gh pr create \
+            --repo MiguelRodo/dotfiles \
+            --head merged-changes-satvilab \
+            --base main \
+            --title "Sync with Upstream" \
+            --body "This PR syncs your fork with the upstream repository." \
+            --assignee @me
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
 
       - name: Create Pull Request for Manual Merge
-        if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'manual' }}
+        if: ${{ env.MERGE_STATUS == 'failure' }}
         run: |
           echo "Creating PR for unsuccessful merge"
-          echo "Checking for differences using 'git rev-list'"
-          git rev-list --left-right --count main...unmerged-changes-satvilab  # Show the rev-list differences
-          if [ "$(git rev-list --count main..unmerged-changes-satvilab)" -eq 0 ]; then
-            echo "No differences found, skipping PR creation."
-          else
-            gh pr create \
-              --repo MiguelRodo/dotfiles \
-              --head unmerged-changes-satvilab \
-              --base main \
-              --title "Manual Merge Required: Sync with Upstream" \
-              --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
-              --assignee @me
-          fi
+          gh pr create \
+            --repo MiguelRodo/dotfiles \
+            --head unmerged-changes-satvilab \
+            --base main \
+            --title "Manual Merge Required: Sync with Upstream" \
+            --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
+            --assignee @me
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
