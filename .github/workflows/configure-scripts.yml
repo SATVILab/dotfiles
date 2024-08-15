@@ -1,4 +1,4 @@
-name: "Configure scripts and hidden files"
+name: "Configure scripts"
 
 on:
   push:
@@ -12,22 +12,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Ensure scripts and hidden files are executable and have Unix line endings
+      - name: Configure scripts
         run: |
-          find scripts/ -type f -exec chmod +x {} \;
-          find scripts/ -type f -exec dos2unix {} \;
-          find . -maxdepth 1 -name ".*" -type f -exec dos2unix {} \;
+          chmod +x scripts/*
+          dos2unix scripts/*
 
       - name: Add, commit, and push changes
+        id: commit
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add scripts/*
-          git add .[^.]*
-
           if git diff --cached --quiet; then
             echo "No changes to commit"
+            echo "COMMIT_PUSHED=false" >> $GITHUB_ENV
           else
-            git commit -m "Ensure scripts and hidden files are executable and have Unix line endings"
-            git push
+            git commit -m "Configure scripts"
+            git push origin main
+            echo "COMMIT_PUSHED=true" >> $GITHUB_ENV
           fi
+
+      - name: Create Pull Request
+        if: env.COMMIT_PUSHED == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Configure scripts"
+          branch: "main"
+          base: "main"
+          title: "Automated Pull Request to Configure Scripts"
+          body: "This PR is automatically created by GitHub Actions to configure scripts."
+          head: "MiguelRodo:main"
