@@ -27,15 +27,12 @@ jobs:
           git add scripts/*
           if git diff --cached --quiet; then
             echo "No changes to commit"
-            echo "COMMIT_PUSHED=false" >> $GITHUB_ENV
           else
             git commit -m "Configure scripts"
             git push origin main
-            echo "COMMIT_PUSHED=true" >> $GITHUB_ENV
           fi
 
       - name: Create Pull Request
-        if: env.COMMIT_PUSHED == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
