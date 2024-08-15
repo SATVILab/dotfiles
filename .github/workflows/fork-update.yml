@@ -15,28 +15,45 @@ jobs:
       - name: Checkout Fork Repository
         uses: actions/checkout@v4
         with:
-          repository: MiguelRodo/dotfiles  # Check out your fork repository
-          token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
+          repository: MiguelRodo/dotfiles
+          token: ${{ secrets.MIGUELRODOPAT }}
+
+      - name: Delete Existing PR Branches
+        run: |
+          for branch in "merged-changes-satvilab" "satvilab-changes-unmerged"; do
+            if git ls-remote --exit-code --heads origin $branch; then
+              echo "Deleting existing branch: $branch"
+              git push origin --delete $branch
+            else
+              echo "Branch $branch does not exist."
+            fi
+          done
+
+      - name: Delete Existing PRs
+        run: |
+          gh pr list --state open --repo MiguelRodo/dotfiles --json number,headRefName \
+            --jq '.[] | select(.headRefName=="merged-changes-satvilab" or .headRefName=="satvilab-changes-unmerged") | .number' |
+            xargs -I {} gh pr close {} --repo MiguelRodo/dotfiles
 
       - name: Create New Branch for Merging
         run: |
-          git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
+          git checkout -b merged-changes-satvilab main
 
       - name: Add Upstream Repository
         run: |
-          git remote add upstream https://github.com/SATVILab/dotfiles.git  # Add the upstream repository
-          git fetch upstream main  # Fetch the upstream main branch
+          git remote add upstream https://github.com/SATVILab/dotfiles.git
+          git fetch upstream main
 
       - name: Attempt to Merge with Upstream
         run: |
-          git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Attempt to merge upstream's 'main' into 'merged-changes-satvilab'
+          git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt
 
       - name: Handle Merge Conflicts
         run: |
           if [ -f merge_status.txt ]; then
             echo "Creating branch for manual merge."
-            git checkout -b satvilab-changes-unmerged upstream/main  # Create a new branch 'satvilab-changes-unmerged' from the upstream's main branch
-            git push origin satvilab-changes-unmerged  # Push this new branch to your fork
+            git checkout -b satvilab-changes-unmerged upstream/main
+            git push origin satvilab-changes-unmerged
             echo "MERGE_STATUS=manual" >> $GITHUB_ENV
           else
             echo "MERGE_STATUS=success" >> $GITHUB_ENV
@@ -51,7 +68,7 @@ jobs:
 
       - name: Push the Merged Branch to Fork
         run: |
-          git push --force origin merged-changes-satvilab  # Push the merged branch to your fork
+          git push --force origin merged-changes-satvilab
 
       - name: Check for Differences
         run: |
@@ -62,28 +79,9 @@ jobs:
             echo "NO_DIFF=false" >> $GITHUB_ENV
           fi
 
-      - name: Delete Existing PR Branches and PRs
-        run: |
-          # Delete existing PRs for 'merged-changes-satvilab'
-          PR_NUMBER=$(gh pr list --head merged-changes-satvilab --repo MiguelRodo/dotfiles --json number --jq '.[].number')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr close $PR_NUMBER --repo MiguelRodo/dotfiles
-          fi
-          git push origin --delete merged-changes-satvilab || true
-
-          # Delete existing PRs for 'satvilab-changes-unmerged'
-          PR_NUMBER=$(gh pr list --head satvilab-changes-unmerged --repo MiguelRodo/dotfiles --json number --jq '.[].number')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr close $PR_NUMBER --repo MiguelRodo/dotfiles
-          fi
-          git push origin --delete satvilab-changes-unmerged || true
-        env: 
-          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
-
       - name: Create Pull Request for Successful Merge
         if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'success' }}
         run: |
-          echo "Creating PR for successful merge"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head merged-changes-satvilab \
@@ -91,13 +89,12 @@ jobs:
             --title "Sync with Upstream" \
             --body "This PR syncs your fork with the upstream repository." \
             --assignee @me
-        env: 
-          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
+        env:
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
 
       - name: Create Pull Request for Manual Merge
         if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'manual' }}
         run: |
-          echo "Creating PR for unsuccessful merge"
           gh pr create \
             --repo MiguelRodo/dotfiles \
             --head satvilab-changes-unmerged \
@@ -105,5 +102,5 @@ jobs:
             --title "Manual Merge Required: Sync with Upstream" \
             --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
             --assignee @me
-        env: 
-          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
+        env:
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
