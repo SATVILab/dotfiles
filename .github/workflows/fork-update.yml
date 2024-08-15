@@ -39,7 +39,6 @@ jobs:
         run: |
           echo "Creating a new branch 'merged-changes-satvilab' from 'main'"
           git checkout -b merged-changes-satvilab main
-          echo "Trigger changes"
 
       - name: Add Upstream Repository
         run: |
