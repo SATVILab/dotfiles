@@ -72,7 +72,6 @@ jobs:
             --base main \
             --title "Sync with Upstream" \
             --body "This PR syncs your fork with the upstream repository." \
-            --label "sync" \
             --assignee @me
         env: 
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
@@ -87,7 +86,6 @@ jobs:
             --base main \
             --title "Manual Merge Required: Sync with Upstream" \
             --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
-            --label "manual-merge" \
             --assignee @me
         env: 
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
