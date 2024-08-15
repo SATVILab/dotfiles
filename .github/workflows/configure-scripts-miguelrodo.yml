@@ -80,3 +80,6 @@ jobs:
             --body "This PR syncs your fork with the upstream repository." \
             --label "sync" \
             --assignee @me
+        with:
+          env: 
+            GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
