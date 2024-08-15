@@ -12,7 +12,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure scripts
+      - name: Check for non-Unix line endings
+        id: check_line_endings
+        run: |
+          if grep -rIl $'\r' scripts/; then
+            echo "NEEDS_CONVERSION=true" >> $GITHUB_ENV
+          else
+            echo "NEEDS_CONVERSION=false" >> $GITHUB_ENV
+          fi
+      
+      - name: Install dos2unix and convert line endings
+        if: env.NEEDS_CONVERSION == 'true'
         run: |
           sudo apt-get update -y
           sudo apt-get install dos2unix -y
