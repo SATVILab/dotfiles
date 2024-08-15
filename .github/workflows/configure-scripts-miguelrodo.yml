@@ -48,8 +48,18 @@ jobs:
         run: |
           git push --force origin merged-changes-satvilab  # Push the new branch with the merged changes to your fork
 
+      - name: Check for differences
+        run: |
+          git fetch origin main
+          if git diff --exit-code main..HEAD; then
+            echo "No differences between branches."
+            echo "NO_DIFF=true" >> $GITHUB_ENV
+          else
+            echo "Differences detected."
+            echo "NO_DIFF=false" >> $GITHUB_ENV
+      
       - name: Create Pull Request
-        if: success()
+        if: env.NO_DIFF == 'false'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT secret
@@ -57,3 +67,4 @@ jobs:
           title: "Sync with Upstream"
           body: "This PR syncs your fork with the upstream repository."
           base: "main"  # Base branch is the main branch of your fork
+        
