@@ -47,7 +47,7 @@ jobs:
         with:
           token: ${{ secrets.MIGUELRODOPAT }}
           commit-message: "Configure scripts"
-          branch: "main"
+          branch: "configure-scripts-branch"
           push-to-fork: "MiguelRodo/dotfiles"
           title: "Automated Pull Request to Configure Scripts"
           body: "This PR is automatically created by GitHub Actions to configure scripts."
