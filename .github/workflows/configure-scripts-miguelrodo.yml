@@ -80,5 +80,4 @@ jobs:
             --base main \
             --title "Sync with Upstream" \
             --body "This PR syncs your fork with the upstream repository." \
-            --label "sync" \
             --assignee @me
