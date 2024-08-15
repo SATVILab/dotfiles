@@ -20,7 +20,7 @@ jobs:
 
       - name: Delete Existing PR Branches
         run: |
-          for branch in "merged-changes-satvilab" "satvilab-changes-unmerged"; do
+          for branch in "merged-changes-satvilab" "unmerged-changes-satvilab"; do
             if git ls-remote --exit-code --heads origin $branch; then
               echo "Deleting existing branch: $branch"
               git push origin --delete $branch
@@ -32,7 +32,7 @@ jobs:
       - name: Delete Existing PRs
         run: |
           gh pr list --state open --repo MiguelRodo/dotfiles --json number,headRefName \
-            --jq '.[] | select(.headRefName=="merged-changes-satvilab" or .headRefName=="satvilab-changes-unmerged") | .number' |
+            --jq '.[] | select(.headRefName=="merged-changes-satvilab" or .headRefName=="unmerged-changes-satvilab") | .number' |
             xargs -I {} gh pr close {} --repo MiguelRodo/dotfiles
 
       - name: Create New Branch for Merging
@@ -52,8 +52,8 @@ jobs:
         run: |
           if [ -f merge_status.txt ]; then
             echo "Creating branch for manual merge."
-            git checkout -b satvilab-changes-unmerged upstream/main
-            git push origin satvilab-changes-unmerged
+            git checkout -b unmerged-changes-satvilab upstream/main
+            git push origin unmerged-changes-satvilab
             echo "MERGE_STATUS=manual" >> $GITHUB_ENV
           else
             echo "MERGE_STATUS=success" >> $GITHUB_ENV
@@ -82,25 +82,33 @@ jobs:
       - name: Create Pull Request for Successful Merge
         if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'success' }}
         run: |
-          gh pr create \
-            --repo MiguelRodo/dotfiles \
-            --head merged-changes-satvilab \
-            --base main \
-            --title "Sync with Upstream" \
-            --body "This PR syncs your fork with the upstream repository." \
-            --assignee @me
+          if [ "$(git rev-list --count main..merged-changes-satvilab)" -eq 0 ]; then
+            echo "No differences found, skipping PR creation."
+          else
+            gh pr create \
+              --repo MiguelRodo/dotfiles \
+              --head merged-changes-satvilab \
+              --base main \
+              --title "Sync with Upstream" \
+              --body "This PR syncs your fork with the upstream repository." \
+              --assignee @me
+          fi
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
 
       - name: Create Pull Request for Manual Merge
         if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'manual' }}
         run: |
-          gh pr create \
-            --repo MiguelRodo/dotfiles \
-            --head satvilab-changes-unmerged \
-            --base main \
-            --title "Manual Merge Required: Sync with Upstream" \
-            --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
-            --assignee @me
+          if [ "$(git rev-list --count main..unmerged-changes-satvilab)" -eq 0 ]; then
+            echo "No differences found, skipping PR creation."
+          else
+            gh pr create \
+              --repo MiguelRodo/dotfiles \
+              --head unmerged-changes-satvilab \
+              --base main \
+              --title "Manual Merge Required: Sync with Upstream" \
+              --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
+              --assignee @me
+          fi
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}
