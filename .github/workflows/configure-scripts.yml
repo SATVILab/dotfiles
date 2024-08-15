@@ -44,6 +44,4 @@ jobs:
           push-to-fork: "SATVILab/dotfiles"
           title: "Automated Pull Request to Configure Scripts"
           body: "This PR is automatically created by GitHub Actions to configure scripts."
-          head: "SATVILab:configure-scripts-branch"
           base: "main"
-          fork: "MiguelRodo/dotfiles"
