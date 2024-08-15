@@ -23,7 +23,7 @@ jobs:
           fi
       
       - name: Install dos2unix and convert line endings
-        if: env.NEEDS_CONVERSION == 'true'
+        if: ${{ env.NEEDS_CONVERSION == 'true' }}
         run: |
           sudo apt-get update -y
           sudo apt-get install dos2unix -y
