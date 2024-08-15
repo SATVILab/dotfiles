@@ -34,7 +34,7 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add .
-          git diff-index --quiet HEAD || git commit -m "Merge upstream changes and resolve conflicts favoring upstream"  # Commit the merged changes
+          git commit -m "Merge upstream changes and resolve conflicts favoring upstream" || echo "No changes to commit"
 
       - name: Check for Merge Conflicts
         run: |
