@@ -1,12 +1,13 @@
 name: Update Fork
 
 on:
-  schedule:
-    - cron: '0 0 * * 0'  # Schedule to run every Sunday at midnight
+  push:
+    branches:
+      - main
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  updateFork:
+  update-miguelrodo:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Fork Repository
@@ -27,6 +28,7 @@ jobs:
 
       - name: Create New Branch for Merging
         run: |
+          echo "Triggering change"
           git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
 
       - name: Add Upstream Repository
