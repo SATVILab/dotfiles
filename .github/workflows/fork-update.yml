@@ -48,7 +48,6 @@ jobs:
 
       - name: Merge Upstream Changes
         run: |
-          git checkout -b merged-changes-satvilab
           echo "Attempting to merge 'upstream/main' into 'merged-changes-satvilab'"
           
           # Save the current state
