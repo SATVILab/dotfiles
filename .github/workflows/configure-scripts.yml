@@ -14,10 +14,10 @@ jobs:
 
       - name: Configure scripts
         run: |
+          sudo apt-get update -y
+          sudo apt-get install dos2unix -y
+          sudo dos2unix scripts/*
           chmod 755 scripts/*
-          apt-get update -y
-          apt-get install dos2unix -y
-          dos2unix scripts/*
 
       - name: Add, commit, and push changes
         id: commit
