@@ -1,13 +1,12 @@
 name: Update Fork
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 0 * * 0'  # Schedule to run every Sunday at midnight
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  update-miguelrodo:
+  updateFork:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Fork Repository
@@ -16,19 +15,8 @@ jobs:
           repository: MiguelRodo/dotfiles  # Check out your fork repository
           token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
 
-      - name: Install GitHub CLI if not available
-        run: |
-          if ! command -v gh &> /dev/null; then
-            echo "gh could not be found, installing..."
-            sudo apt-get update
-            sudo apt-get install gh -y
-          else
-            echo "gh is already installed"
-          fi
-
       - name: Create New Branch for Merging
         run: |
-          echo "Triggering change"
           git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
 
       - name: Add Upstream Repository
@@ -36,9 +24,17 @@ jobs:
           git remote add upstream https://github.com/SATVILab/dotfiles.git  # Add the upstream repository
           git fetch upstream main  # Fetch the upstream main branch
 
-      - name: Merge New Branch with Upstream
+      - name: Attempt to Merge with Upstream
         run: |
-          git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Merge upstream's 'main' into 'merged-changes-satvilab', favoring upstream changes
+          git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Attempt to merge upstream's 'main' into 'merged-changes-satvilab'
+
+      - name: Handle Merge Conflicts
+        run: |
+          if [ -f merge_status.txt ]; then
+            echo "Creating branch for manual merge."
+            git checkout -b satvilab-changes-unmerged upstream/main  # Create a new branch 'satvilab-changes-unmerged' from the upstream's main branch
+            git push origin satvilab-changes-unmerged  # Push this new branch to your fork
+          fi
 
       - name: Commit Changes
         if: success()
@@ -48,19 +44,12 @@ jobs:
           git add .
           git commit -m "Merge upstream changes and resolve conflicts favoring upstream" || echo "No changes to commit"
 
-      - name: Check for Merge Conflicts
-        run: |
-          if [ -f merge_status.txt ]; then
-            echo "Merge conflicts detected, please resolve manually."
-            exit 1
-          fi
-
-      - name: Push the New Branch to Fork
+      - name: Push the Merged Branch to Fork
         if: success()
         run: |
-          git push --force origin merged-changes-satvilab  # Push the new branch with the merged changes to your fork
+          git push --force origin merged-changes-satvilab  # Push the merged branch to your fork
 
-      - name: Check for differences
+      - name: Check for Differences
         run: |
           git fetch origin main
           if git diff --exit-code main..HEAD; then
@@ -71,10 +60,8 @@ jobs:
             echo "NO_DIFF=false" >> $GITHUB_ENV
           fi
 
-      - name: Create Pull Request Using gh CLI
-        if: ${{ env.NO_DIFF == 'false' }}
-        env:
-          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
+      - name: Create Pull Request for Successful Merge
+        if: env.NO_DIFF == 'false' && ![ -f merge_status.txt ]
         run: |
           gh pr create \
             --repo MiguelRodo/dotfiles \
@@ -82,4 +69,21 @@ jobs:
             --base main \
             --title "Sync with Upstream" \
             --body "This PR syncs your fork with the upstream repository." \
+            --label "sync" \
             --assignee @me
+        env: 
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
+
+      - name: Create Pull Request for Manual Merge
+        if: env.NO_DIFF == 'false' && [ -f merge_status.txt ]
+        run: |
+          gh pr create \
+            --repo MiguelRodo/dotfiles \
+            --head satvilab-changes-unmerged \
+            --base main \
+            --title "Manual Merge Required: Sync with Upstream" \
+            --body "This PR contains upstream changes that could not be merged automatically. Manual resolution is required." \
+            --label "manual-merge" \
+            --assignee @me
+        env: 
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
