@@ -1,0 +1,33 @@
+name: "Configure scripts and hidden files"
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  configure-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure scripts and hidden files are executable and have Unix line endings
+        run: |
+          find scripts/ -type f -exec chmod +x {} \;
+          find scripts/ -type f -exec dos2unix {} \;
+          find . -maxdepth 1 -name ".*" -type f -exec dos2unix {} \;
+
+      - name: Add, commit, and push changes
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add scripts/*
+          git add .[^.]*
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Ensure scripts and hidden files are executable and have Unix line endings"
+            git push
+          fi
