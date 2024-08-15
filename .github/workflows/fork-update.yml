@@ -72,7 +72,7 @@ jobs:
           fi
 
       - name: Create Pull Request Using gh CLI
-        if: env.NO_DIFF == 'false'
+        if: ${{ env.NO_DIFF == 'false' }}
         env:
           GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
         run: |
