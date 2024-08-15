@@ -14,7 +14,9 @@ jobs:
 
       - name: Configure scripts
         run: |
-          chmod +x scripts/*
+          chmod 755 scripts/*
+          apt-get update -y
+          apt-get install dos2unix -y
           dos2unix scripts/*
 
       - name: Add, commit, and push changes
