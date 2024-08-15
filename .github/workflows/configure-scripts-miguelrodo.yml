@@ -15,6 +15,16 @@ jobs:
           repository: MiguelRodo/dotfiles  # Check out your fork repository
           token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
 
+      - name: Install GitHub CLI if not available
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "gh could not be found, installing..."
+            sudo apt-get update
+            sudo apt-get install gh -y
+          else
+            echo "gh is already installed"
+          fi
+
       - name: Create New Branch for Merging
         run: |
           git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
@@ -59,13 +69,14 @@ jobs:
             echo "NO_DIFF=false" >> $GITHUB_ENV
           fi
 
-      - name: Create Pull Request
+      - name: Create Pull Request Using gh CLI
         if: env.NO_DIFF == 'false'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT secret
-          branch: "merged-changes-satvilab"  # The new branch created with merged changes
-          title: "Sync with Upstream"
-          body: "This PR syncs your fork with the upstream repository."
-          base: "main"  # Base branch is the main branch of your fork
-
+        run: |
+          gh pr create \
+            --repo MiguelRodo/dotfiles \
+            --head merged-changes-satvilab \
+            --base main \
+            --title "Sync with Upstream" \
+            --body "This PR syncs your fork with the upstream repository." \
+            --label "sync" \
+            --assignee @me
