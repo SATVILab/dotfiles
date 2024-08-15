@@ -13,16 +13,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: MiguelRodo/dotfiles  # Check out your fork repository
+          token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
 
       - name: Add Upstream Repository
         run: |
           git remote add upstream https://github.com/SATVILab/dotfiles.git  # Add the upstream repository
-          git fetch upstream main:satvilab-main  # Fetch the upstream main branch
+          git fetch upstream main  # Fetch the upstream main branch
+          git checkout -b satvilab-main upstream/main  # Create a new branch 'satvilab-main' from the upstream main branch
 
-      - name: Create New Branch for Upstream Changes
+      - name: Create New Branch for Merging
         run: |
-          git checkout -b satvilab-changes  # Create a new branch for the upstream changes
-          git merge -X theirs satvilab-main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt
+          git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
+          git merge -X theirs satvilab-main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Merge 'satvilab-main' into 'merged-changes-satvilab', favoring upstream changes
 
       - name: Commit Changes
         if: success()
@@ -42,14 +44,14 @@ jobs:
       - name: Push the New Branch to Fork
         if: success()
         run: |
-          git push origin satvilab-changes  # Push the new branch with the merged changes to your fork
+          git push origin merged-changes-satvilab  # Push the new branch with the merged changes to your fork
 
       - name: Create Pull Request
         if: success()
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT secret
-          branch: "satvilab-changes"  # The new branch created with merged changes
+          branch: "merged-changes-satvilab"  # The new branch created with merged changes
           title: "Sync with Upstream"
           body: "This PR syncs your fork with the upstream repository."
           base: "main"  # Base branch is the main branch of your fork
