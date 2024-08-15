@@ -15,16 +15,18 @@ jobs:
           repository: MiguelRodo/dotfiles  # Check out your fork repository
           token: ${{ secrets.MIGUELRODOPAT }}  # Use your PAT for authentication
 
+      - name: Create New Branch for Merging
+        run: |
+          git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
+
       - name: Add Upstream Repository
         run: |
           git remote add upstream https://github.com/SATVILab/dotfiles.git  # Add the upstream repository
           git fetch upstream main  # Fetch the upstream main branch
-          git checkout -b satvilab-main upstream/main  # Create a new branch 'satvilab-main' from the upstream main branch
 
-      - name: Create New Branch for Merging
+      - name: Merge New Branch with Upstream
         run: |
-          git checkout -b merged-changes-satvilab main  # Create a new branch 'merged-changes-satvilab' from the fork's main branch
-          git merge -X theirs satvilab-main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Merge 'satvilab-main' into 'merged-changes-satvilab', favoring upstream changes
+          git merge -X theirs upstream/main || echo "Automatic merge failed, manual intervention required!" > merge_status.txt  # Merge upstream's 'main' into 'merged-changes-satvilab', favoring upstream changes
 
       - name: Commit Changes
         if: success()
@@ -44,7 +46,7 @@ jobs:
       - name: Push the New Branch to Fork
         if: success()
         run: |
-          git push origin merged-changes-satvilab  # Push the new branch with the merged changes to your fork
+          git push --force origin merged-changes-satvilab  # Push the new branch with the merged changes to your fork
 
       - name: Create Pull Request
         if: success()
