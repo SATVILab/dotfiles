@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * 0'  # Schedule to run every Sunday at midnight
   push:
-    branch:
+    branches:
       - main
   workflow_dispatch:  # Allows manual trigger
 
@@ -61,6 +61,24 @@ jobs:
           else
             echo "NO_DIFF=false" >> $GITHUB_ENV
           fi
+
+      - name: Delete Existing PR Branches and PRs
+        run: |
+          # Delete existing PRs for 'merged-changes-satvilab'
+          PR_NUMBER=$(gh pr list --head merged-changes-satvilab --repo MiguelRodo/dotfiles --json number --jq '.[].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr close $PR_NUMBER --repo MiguelRodo/dotfiles
+          fi
+          git push origin --delete merged-changes-satvilab || true
+
+          # Delete existing PRs for 'satvilab-changes-unmerged'
+          PR_NUMBER=$(gh pr list --head satvilab-changes-unmerged --repo MiguelRodo/dotfiles --json number --jq '.[].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr close $PR_NUMBER --repo MiguelRodo/dotfiles
+          fi
+          git push origin --delete satvilab-changes-unmerged || true
+        env: 
+          GH_TOKEN: ${{ secrets.MIGUELRODOPAT }}  # Export the token as an environment variable
 
       - name: Create Pull Request for Successful Merge
         if: ${{ env.NO_DIFF == 'false' && env.MERGE_STATUS == 'success' }}
