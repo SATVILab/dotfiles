@@ -60,14 +60,17 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
-# Log the parsed options
-log "Options:"
-log "  SIF File: $SIF_FILE"
-log "  Directory: $DIRECTORY"
-log "  Custom Command: $CUSTOM_COMMAND"
-log "  Scratch Directory: $SCRATCH_DIR"
-log "  Home Directory: $HOME_DIR"
-log "  Log File: $log_file"
+# Wrap the custom command in single quotes
+if [ -n "$CUSTOM_COMMAND" ]; then
+    # Wrap each individual argument in single quotes, if not already quoted
+    if ! echo "$CUSTOM_COMMAND" | grep -q "^\'" ]; then
+      CUSTOM_COMMAND="'$CUSTOM_COMMAND"  
+    fi
+    if ! echo "$CUSTOM_COMMAND" | grep -q "'$" "$CUSTOM_COMMAND" ]; then
+      CUSTOM_COMMAND="$CUSTOM_COMMAND'"
+    fi
+fi
+
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
@@ -83,6 +86,16 @@ else
     exit 1
 fi
 
+# Log the parsed options
+log "Options:"
+log "  SIF File: $SIF_FILE"
+log "  Directory: $DIRECTORY"
+log "  Scratch Directory: $SCRATCH_DIR"
+log "  Home Directory: $HOME_DIR"
+log "  SIF Path: $SIF_PATH"
+log "  Custom Command: $CUSTOM_COMMAND"
+log "  Log File: $log_file"
+
 # Function to handle errors and log the location of the log file
 error_handler() {
     log "An error occurred. See the log file for details: $log_file"
@@ -93,11 +106,7 @@ error_handler() {
 
 # Trap errors to run the error handler
 trap 'error_handler' ERR
-
-# Wrap the custom command in single quotes
 if [ -n "$CUSTOM_COMMAND" ]; then
-    # Wrap each individual argument in single quotes, if not already quoted
-    CUSTOM_COMMAND="'$CUSTOM_COMMAND'"
     log "Running Apptainer image with custom command: $CUSTOM_COMMAND from '$SIF_PATH'"
     apptainer exec "$SIF_PATH" bash -c "$CUSTOM_COMMAND"
 else
