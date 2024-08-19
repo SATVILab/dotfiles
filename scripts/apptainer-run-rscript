@@ -5,24 +5,22 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
-    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
+    echo "  <command>                   : Custom command to run with Rscript."
     echo ""
-    echo "Example: $0 -s mycontainer echo \"Hello, World!\""
-    echo "Note: If your command includes special characters,"
-    echo "such as round brackets, dollar symbols or quotes, ensure it is wrapped in quotes."
-    echo "It is typically best to wrap in quotes."
+    echo "Example: $0 -s mycontainer 'print(\\\"abc\\\")'"
+    echo "As above, always enclose your command inside single quotes,"
+    echo "and escape any single or double quotes within it."
+    echo "For example, the following two are incorrect:"
+    echo "$0 -s mycontainer 'print(\"abc\")'"
+    echo "$0 -s mycontainer print(\\\"abc\\\")"
     exit 0
 }
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
-SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
-CUSTOM_COMMAND=()
 CUSTOM_COMMAND=()
 
 # Parse named parameters and command
@@ -31,11 +29,9 @@ while [[ "$#" -gt 0 ]]; do
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -h|--help) usage ;;
-        --) shift; CUSTOM_COMMAND+="$*"; break ;;
-        --) shift; CUSTOM_COMMAND+="$*"; break ;;
+        --) shift; CUSTOM_COMMAND+=("$@"); break ;;
         -*|--*) usage ;;
-        *) CUSTOM_COMMAND+="$*"; break ;;
-        *) CUSTOM_COMMAND+="$*"; break ;;
+        *) CUSTOM_COMMAND+=("$1"); shift ;;
     esac
 done
 
@@ -77,10 +73,8 @@ escape_special_chars() {
     echo "$input"
 }
 
-# Escape single and double quotes in the command
-# Escape special characters
-ESCAPED_COMMAND=$(escape_special_chars "$CUSTOM_COMMAND")
-FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
+# Escape special characters in the command
+ESCAPED_COMMAND=$(escape_special_chars "$(printf "%s " "${CUSTOM_COMMAND[@]}")")
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
@@ -103,9 +97,8 @@ log "  Directory: $DIRECTORY"
 log "  Scratch Directory: $SCRATCH_DIR"
 log "  Home Directory: $HOME_DIR"
 log "  SIF Path: $SIF_PATH"
-log "  Initial Command: $CUSTOM_COMMAND"
+log "  Initial Command: ${CUSTOM_COMMAND[*]}"
 log "  Escaped Command: $ESCAPED_COMMAND"
-log "  Full Command: $FULL_COMMAND"
 log "  Log File: $log_file"
 
 # Function to handle errors and log the location of the log file
@@ -120,7 +113,7 @@ error_handler() {
 trap 'error_handler' ERR
 
 # Log the command for debugging
-echo "Running Apptainer with Rscript command: $FULL_COMMAND"
+log "Running Apptainer with Rscript command: $ESCAPED_COMMAND"
 
 # Execute the command with apptainer
-apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- "$FULL_COMMAND"
+apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- Rscript -e "$ESCAPED_COMMAND"
