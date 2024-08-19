@@ -4,20 +4,22 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] <R code>"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  <R code>                    : R code to run inside the container with Rscript -e (required)"
+    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
     echo ""
-    echo "Example: $0 -s mycontainer \"print('abc')\""
-    echo "Note: Ensure your R code is wrapped in quotes if it contains special characters."
+    echo "Example: $0 -s mycontainer echo \"Hello, World!\""
+    echo "Note: If your command includes special characters,"
+    echo "such as round brackets, dollar symbols or quotes, ensure it is wrapped in quotes."
+    echo "It is typically best to wrap in quotes."
     exit 0
 }
 
 # Initialize default values
-SIF_FILE=""
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
-CUSTOM_COMMAND=""
+CUSTOM_COMMAND=()
 
 # Parse named parameters and command
 while [[ "$#" -gt 0 ]]; do
@@ -25,24 +27,94 @@ while [[ "$#" -gt 0 ]]; do
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -h|--help) usage ;;
-        --) shift; CUSTOM_COMMAND="$@"; break ;;
+        --) shift; CUSTOM_COMMAND+="$*"; break ;;
         -*|--*) usage ;;
-        *) CUSTOM_COMMAND="$@"; break ;;
+        *) CUSTOM_COMMAND+="$*"; break ;;
     esac
 done
 
-# Ensure the custom command is provided
-if [ -z "$CUSTOM_COMMAND" ]; then
-    echo "Error: No R command provided."
-    usage
+# Ensure the SIF_FILE ends with .sif and convert to lowercase
+SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
+
+# Determine the base directories
+if [ -n "$APPTAINER_CACHE_DIR" ]; then
+    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
+elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
+    SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
+else
+    SCRATCH_DIR=""
+fi
+
+if [ -d "$HOME/.local/share/apptainer/sif" ]; then
+    HOME_DIR="$HOME/.local/share/apptainer/sif"
+else
+    HOME_DIR=""
+fi
+
+# Create a log directory and log file
+SIF_FILE_BASENAME=$(basename "$SIF_FILE")
+log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
+mkdir -p "$log_dir"
+log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+}
+
+# Function to escape special characters in the command
+escape_special_chars() {
+    local input="$1"
+    input="${input//\\/\\\\}"  # Escape backslashes
+    input="${input//\$/\\\$}"  # Escape dollar signs
+    input="${input//\"/\\\"}"  # Escape double quotes
+    echo "$input"
+}
+
+# Escape single and double quotes in the command
+# Escape special characters
+ESCAPED_COMMAND=$(escape_special_chars "$CUSTOM_COMMAND")
+FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
+
+# Determine the full path of the SIF file
+if [ -n "$DIRECTORY" ]; then
+    SIF_PATH="$DIRECTORY/$SIF_FILE"
+elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
+    SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
+elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
+    SIF_PATH="$HOME_DIR/$SIF_FILE"
+else
+    log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
+    echo "To view the log file, run:"
+    echo "cat $log_file"
     exit 1
 fi
 
-# Escape any double quotes in the custom command
-ESCAPED_COMMAND=$(echo "$CUSTOM_COMMAND" | sed 's/"/\\"/g')
+# Log the parsed options
+log "Options:"
+log "  SIF File: $SIF_FILE"
+log "  Directory: $DIRECTORY"
+log "  Scratch Directory: $SCRATCH_DIR"
+log "  Home Directory: $HOME_DIR"
+log "  SIF Path: $SIF_PATH"
+log "  Initial Command: $CUSTOM_COMMAND"
+log "  Escaped Command: $ESCAPED_COMMAND"
+log "  Full Command: $FULL_COMMAND"
+log "  Log File: $log_file"
 
-# Build the full command to pass to apptainer-run
-FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
+# Function to handle errors and log the location of the log file
+error_handler() {
+    log "An error occurred. See the log file for details: $log_file"
+    echo "To view the log file, run:"
+    echo "cat $log_file"
+    exit 1
+}
 
-# Call apptainer-run with the prepared command, passing through SIF_FILE and DIRECTORY without changes
+# Trap errors to run the error handler
+trap 'error_handler' ERR
+
+# Log the command for debugging
+echo "Running Apptainer with Rscript command: $FULL_COMMAND"
+
+# Execute the command with apptainer
 apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- "$FULL_COMMAND"
