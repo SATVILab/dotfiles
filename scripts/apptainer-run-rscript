@@ -5,18 +5,24 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
+    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
     echo ""
     echo "Example: $0 -s mycontainer echo \"Hello, World!\""
-    echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
+    echo "Note: If your command includes special characters,"
+    echo "such as round brackets, dollar symbols or quotes, ensure it is wrapped in quotes."
+    echo "It is typically best to wrap in quotes."
     exit 0
 }
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
+CUSTOM_COMMAND=()
 CUSTOM_COMMAND=()
 
 # Parse named parameters and command
@@ -26,7 +32,9 @@ while [[ "$#" -gt 0 ]]; do
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND+="$*"; break ;;
+        --) shift; CUSTOM_COMMAND+="$*"; break ;;
         -*|--*) usage ;;
+        *) CUSTOM_COMMAND+="$*"; break ;;
         *) CUSTOM_COMMAND+="$*"; break ;;
     esac
 done
@@ -60,8 +68,19 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
+# Function to escape special characters in the command
+escape_special_chars() {
+    local input="$1"
+    input="${input//\\/\\\\}"  # Escape backslashes
+    input="${input//\$/\\\$}"  # Escape dollar signs
+    input="${input//\"/\\\"}"  # Escape double quotes
+    echo "$input"
+}
+
 # Escape single and double quotes in the command
-ESCAPED_COMMAND=$(printf '%s' "$CUSTOM_COMMAND" | sed "s/\"/\\\\\"/g; s/'/\\\\'/g")
+# Escape special characters
+ESCAPED_COMMAND=$(escape_special_chars "$CUSTOM_COMMAND")
+FULL_COMMAND="Rscript -e \"$ESCAPED_COMMAND\""
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
@@ -86,6 +105,7 @@ log "  Home Directory: $HOME_DIR"
 log "  SIF Path: $SIF_PATH"
 log "  Initial Command: $CUSTOM_COMMAND"
 log "  Escaped Command: $ESCAPED_COMMAND"
+log "  Full Command: $FULL_COMMAND"
 log "  Log File: $log_file"
 
 # Function to handle errors and log the location of the log file
@@ -99,10 +119,8 @@ error_handler() {
 # Trap errors to run the error handler
 trap 'error_handler' ERR
 
-
-
 # Log the command for debugging
-echo "Running Apptainer with Rscript command: $ESCAPED_COMMAND"
+echo "Running Apptainer with Rscript command: $FULL_COMMAND"
 
-# Run the command in Apptainer
-apptainer exec "$SIF_PATH" Rscript -e "$ESCAPED_COMMAND"
+# Execute the command with apptainer
+apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- "$FULL_COMMAND"
