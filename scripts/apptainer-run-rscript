@@ -5,8 +5,10 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
+    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
     echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
     echo ""
     echo "Example: $0 -s mycontainer echo \"Hello, World!\""
@@ -18,7 +20,9 @@ usage() {
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
+CUSTOM_COMMAND=()
 CUSTOM_COMMAND=()
 
 # Parse named parameters and command
@@ -28,7 +32,9 @@ while [[ "$#" -gt 0 ]]; do
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND+="$*"; break ;;
+        --) shift; CUSTOM_COMMAND+="$*"; break ;;
         -*|--*) usage ;;
+        *) CUSTOM_COMMAND+="$*"; break ;;
         *) CUSTOM_COMMAND+="$*"; break ;;
     esac
 done

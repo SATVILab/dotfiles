@@ -109,9 +109,6 @@ fi
 COMMANDS+="/usr/local/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 log "COMMANDS: $COMMANDS"
 
-# Quote the entire command to pass to bash -c
-COMMANDS=$(printf "%q" "$COMMANDS")
-
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
 apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$COMMANDS"
