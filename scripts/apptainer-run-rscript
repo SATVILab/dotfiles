@@ -13,9 +13,8 @@ usage() {
     echo ""
     echo "Guidelines:"
     echo "  - Always enclose your command inside single quotes if it contains special characters."
-    echo "  - Use double quotes within the command for strings or characters, and escape them, e.g.:"
-    echo "    $0 -s mycontainer 'print(\\\"abc\\\")'"
-    echo "  - Avoid escaping quotes unnecessarily; keep the command simple."
+    echo "  - Double quotes within the command will be automatically escaped, e.g.:"
+    echo "    $0 -s mycontainer 'print(\"abc\")'"
     echo "  - It is good practice to always enclose your command in single quotes."
     exit 0
 }
@@ -66,15 +65,16 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
-# Convert CUSTOM_COMMAND array to a single string
+# Convert CUSTOM_COMMAND array to a single string and escape double quotes
 COMMAND_STRING="${CUSTOM_COMMAND[@]}"
+COMMAND_STRING="${COMMAND_STRING//\"/\\\"}"
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
     SIF_PATH="$DIRECTORY/$SIF_FILE"
-elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
+elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE"] ; then
     SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
-elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
+elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE"] ; then
     SIF_PATH="$HOME_DIR/$SIF_FILE"
 else
     log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
