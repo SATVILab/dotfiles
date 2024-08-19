@@ -13,8 +13,8 @@ usage() {
     echo ""
     echo "Guidelines:"
     echo "  - Always enclose your command inside single quotes if it contains special characters."
-    echo "  - Use double quotes within the command for strings or characters, e.g.:"
-    echo "    $0 -s mycontainer 'print(\"abc\")'"
+    echo "  - Use double quotes within the command for strings or characters, and escape them, e.g.:"
+    echo "    $0 -s mycontainer 'print(\\\"abc\\\")'"
     echo "  - Avoid escaping quotes unnecessarily; keep the command simple."
     echo "  - It is good practice to always enclose your command in single quotes."
     exit 0
