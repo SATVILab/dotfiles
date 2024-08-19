@@ -60,17 +60,8 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
-# Wrap the custom command in single quotes
-if [ -n "$CUSTOM_COMMAND" ]; then
-    # Wrap each individual argument in single quotes, if not already quoted
-    if ! echo "$CUSTOM_COMMAND" | grep -q "^\'" ]; then
-      CUSTOM_COMMAND="'$CUSTOM_COMMAND"  
-    fi
-    if ! echo "$CUSTOM_COMMAND" | grep -q "'$" "$CUSTOM_COMMAND" ]; then
-      CUSTOM_COMMAND="$CUSTOM_COMMAND'"
-    fi
-fi
-
+# Quote the custom command
+CUSTOM_COMMAND=$(printf "%q " "${CUSTOM_COMMAND[@]}")
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
