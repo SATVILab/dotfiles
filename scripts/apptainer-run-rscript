@@ -9,12 +9,10 @@ usage() {
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  <command>                   : Custom command to run with Rscript."
     echo ""
-    echo "Example: $0 -s mycontainer 'print(\\\"abc\\\")'"
-    echo "As above, always enclose your command inside single quotes,"
-    echo "and escape any single or double quotes within it."
-    echo "For example, the following two are incorrect:"
+    echo "Example: $0 -s mycontainer 'print(\"abc\")'"
+    echo "As above, always enclose your command inside single quotes if it contains special characters."
+    echo "For example:"
     echo "$0 -s mycontainer 'print(\"abc\")'"
-    echo "$0 -s mycontainer print(\\\"abc\\\")"
     exit 0
 }
 
@@ -64,17 +62,8 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
-# Function to escape special characters in the command
-escape_special_chars() {
-    local input="$1"
-    input="${input//\\/\\\\}"  # Escape backslashes
-    input="${input//\$/\\\$}"  # Escape dollar signs
-    input="${input//\"/\\\"}"  # Escape double quotes
-    echo "$input"
-}
-
-# Escape special characters in the command
-ESCAPED_COMMAND=$(escape_special_chars "$(printf "%s " "${CUSTOM_COMMAND[@]}")")
+# Convert CUSTOM_COMMAND array to a single string
+COMMAND_STRING="${CUSTOM_COMMAND[@]}"
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
@@ -97,8 +86,7 @@ log "  Directory: $DIRECTORY"
 log "  Scratch Directory: $SCRATCH_DIR"
 log "  Home Directory: $HOME_DIR"
 log "  SIF Path: $SIF_PATH"
-log "  Initial Command: ${CUSTOM_COMMAND[*]}"
-log "  Escaped Command: $ESCAPED_COMMAND"
+log "  Command: $COMMAND_STRING"
 log "  Log File: $log_file"
 
 # Function to handle errors and log the location of the log file
@@ -113,7 +101,7 @@ error_handler() {
 trap 'error_handler' ERR
 
 # Log the command for debugging
-log "Running Apptainer with Rscript command: $ESCAPED_COMMAND"
+log "Running Apptainer with Rscript command: $COMMAND_STRING"
 
 # Execute the command with apptainer
-apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- Rscript -e "$ESCAPED_COMMAND"
+apptainer-run ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"} -- Rscript -e "$COMMAND_STRING"
