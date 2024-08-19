@@ -25,9 +25,9 @@ while [[ "$#" -gt 0 ]]; do
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -h|--help) usage ;;
-        --) shift; CUSTOM_COMMAND+=("$@"); break ;;
+        --) shift; CUSTOM_COMMAND+="$*"; break ;;
         -*|--*) usage ;;
-        *) CUSTOM_COMMAND+=("$@"); break ;;
+        *) CUSTOM_COMMAND+="$*"; break ;;
     esac
 done
 
@@ -60,13 +60,8 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
 }
 
-# Quote each part of the custom command
-if [ "${#CUSTOM_COMMAND[@]}" -gt 0 ]; then
-    for i in "${!CUSTOM_COMMAND[@]}"; do
-        CUSTOM_COMMAND[$i]=$(printf "%q" "${CUSTOM_COMMAND[$i]}")
-    done
-    CUSTOM_COMMAND_STRING="${CUSTOM_COMMAND[*]}"
-fi
+# Escape single and double quotes in the command
+ESCAPED_COMMAND=$(printf '%s' "$CUSTOM_COMMAND" | sed "s/\"/\\\\\"/g; s/'/\\\\'/g")
 
 # Determine the full path of the SIF file
 if [ -n "$DIRECTORY" ]; then
@@ -89,7 +84,8 @@ log "  Directory: $DIRECTORY"
 log "  Scratch Directory: $SCRATCH_DIR"
 log "  Home Directory: $HOME_DIR"
 log "  SIF Path: $SIF_PATH"
-log "  Custom Command: $CUSTOM_COMMAND_STRING"
+log "  Initial Command: $CUSTOM_COMMAND"
+log "  Escaped Command: $ESCAPED_COMMAND"
 log "  Log File: $log_file"
 
 # Function to handle errors and log the location of the log file
@@ -103,7 +99,10 @@ error_handler() {
 # Trap errors to run the error handler
 trap 'error_handler' ERR
 
-log "Running Apptainer image with Rscript command: $CUSTOM_COMMAND_STRING from '$SIF_PATH'"
-apptainer exec "$SIF_PATH" Rscript -e "$CUSTOM_COMMAND_STRING"
 
-log "Apptainer run process completed successfully"
+
+# Log the command for debugging
+echo "Running Apptainer with Rscript command: $ESCAPED_COMMAND"
+
+# Run the command in Apptainer
+apptainer exec "$SIF_PATH" Rscript -e "$ESCAPED_COMMAND"
