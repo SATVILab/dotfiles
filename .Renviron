@@ -2,6 +2,6 @@
 PROJR_GITHUB_USER_NAME=SATVILab
 PROJR_FIRST_NAME=SATVI
 PROJR_LAST_NAME=Lab
-PROJR_EMAIL=thomas.scriba@uct.ac.za
+PROJR_EMAIL=satvilab@uct.ac.za
 # renv PAK use
 RENV_CONFIG_PAK_ENABLED=false
