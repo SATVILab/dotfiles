@@ -3,34 +3,10 @@
 # cat-readme-info
 # This script concatenates the contents of various configuration and script files,
 # prepends each with its filename, and outputs everything to a file named 'readme-info'.
-# It then checks if the 'readme-info' file has changed and commits it to a branch named 'readme-info'.
-# If the branch does not exist, it is created. The script echoes each step it performs.
+# The script echoes each step it performs.
 
 # Define the output file
 OUTPUT_FILE="readme-info"
-
-# Save the current branch name
-current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-# Ensure there are no uncommitted changes before switching branches and before creating readme-info
-if ! git diff-index --quiet HEAD --; then
-    echo "Stashing uncommitted changes before switching branches."
-    git stash -u
-    stash_applied=true
-else
-    stash_applied=false
-fi
-
-# Switch to the 'readme-info' branch, creating it if necessary
-if git show-ref --verify --quiet refs/heads/readme-info; then
-    echo "Switching to existing 'readme-info' branch."
-    git checkout readme-info
-else
-    echo "'readme-info' branch does not exist. Creating and switching to it."
-    git checkout -b readme-info
-    echo "Pushing the new 'readme-info' branch to the remote repository."
-    git push -u origin readme-info
-fi
 
 # Start with a clean output file
 echo "Starting the cat-readme-info process. Creating or overwriting the $OUTPUT_FILE file."
@@ -81,42 +57,13 @@ Please update the README.md file based on the content provided here. Ensure the 
 - **Descriptions**: Provide brief descriptions of individual functions, especially the key ones. 
 - **Maintain Links**: Keep any existing useful links and add new ones as appropriate.
 
+In your response, DO NOT print out anything other than just the updated README.md file content.
+For example, do not have an introductory message saying what you're about to do or a 
+closing message saying what you've done.
+Your output should just be something I can copy and paste directly into a Markdown document
+(i.e. I want the raw Markdown).
+Make sure that the last line is blank.
+
 EOF
-
-# Check if the readme-info file has changed
-if ! git diff --quiet -- "$OUTPUT_FILE"; then
-    echo "Changes detected in $OUTPUT_FILE. Adding, committing, and force-pushing changes."
-    git add "$OUTPUT_FILE"
-    git commit -m "Update $OUTPUT_FILE with latest configuration and script content"
-    git push --force origin readme-info
-else
-    echo "No changes detected in $OUTPUT_FILE. Nothing to commit."
-fi
-
-rm "$OUTPUT_FILE"
-
-# Switch back to the original branch
-echo "Switching back to the original branch '$current_branch'."
-git checkout "$current_branch"
-
-# Add the readme-info file in the original branch and commit if it has changed
-echo "Checking if $OUTPUT_FILE has changed in the original branch."
-if ! git diff --quiet -- "$OUTPUT_FILE"; then
-    echo "Changes detected in $OUTPUT_FILE on $current_branch. Adding and committing changes."
-    git add "$OUTPUT_FILE"
-    git commit -m "Include $OUTPUT_FILE with updated information"
-else
-    echo "No changes detected in $OUTPUT_FILE on $current_branch. Nothing to commit."
-fi
-
-# Remove the readme-info file
-echo "Removing the $OUTPUT_FILE file from the working directory."
-rm -f "$OUTPUT_FILE"
-
-# Apply stashed changes if any were stashed
-if [ "$stash_applied" = true ]; then
-    echo "Reapplying stashed changes."
-    git stash pop
-fi
 
 echo "cat-readme-info process complete."
