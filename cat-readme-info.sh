@@ -62,6 +62,9 @@ For example, do not have an introductory message saying what you're about to do 
 closing message saying what you've done.
 Your output should just be something I can copy and paste directly into a Markdown document
 (i.e. I want the raw Markdown).
+That said, DO NOT put the entire output inside Markdown fences (e.g. ```markdown at the front and end).
+All I want is to be able to click that copy button at the bottom of your next message
+and be able to paste that directly into a Markdown doc.
 Make sure that the last line is blank.
 
 EOF
