@@ -9,6 +9,29 @@
 # Define the output file
 OUTPUT_FILE="readme-info"
 
+# Save the current branch name
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# Ensure there are no uncommitted changes before switching branches and before creating readme-info
+if ! git diff-index --quiet HEAD --; then
+    echo "Stashing uncommitted changes before switching branches."
+    git stash -u
+    stash_applied=true
+else
+    stash_applied=false
+fi
+
+# Switch to the 'readme-info' branch, creating it if necessary
+if git show-ref --verify --quiet refs/heads/readme-info; then
+    echo "Switching to existing 'readme-info' branch."
+    git checkout readme-info
+else
+    echo "'readme-info' branch does not exist. Creating and switching to it."
+    git checkout -b readme-info
+    echo "Pushing the new 'readme-info' branch to the remote repository."
+    git push -u origin readme-info
+fi
+
 # Start with a clean output file
 echo "Starting the cat-readme-info process. Creating or overwriting the $OUTPUT_FILE file."
 echo "This file contains information from various configuration and script files." > $OUTPUT_FILE
@@ -60,27 +83,6 @@ Please update the README.md file based on the content provided here. Ensure the 
 
 EOF
 
-# Save the current branch name
-current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-# Ensure there are no uncommitted changes before switching branches
-if ! git diff-index --quiet HEAD --; then
-    echo "Stashing uncommitted changes before switching branches."
-    git stash -u
-    stash_applied=true
-else
-    stash_applied=false
-fi
-
-# Switch to the 'readme-info' branch, creating it if necessary
-if git show-ref --verify --quiet refs/heads/readme-info; then
-    echo "Switching to existing 'readme-info' branch."
-    git checkout readme-info
-else
-    echo "'readme-info' branch does not exist. Creating and switching to it."
-    git checkout -b readme-info
-fi
-
 # Check if the readme-info file has changed
 if ! git diff --quiet -- "$OUTPUT_FILE"; then
     echo "Changes detected in $OUTPUT_FILE. Adding, committing, and force-pushing changes."
@@ -91,9 +93,25 @@ else
     echo "No changes detected in $OUTPUT_FILE. Nothing to commit."
 fi
 
+rm "$OUTPUT_FILE"
+
 # Switch back to the original branch
 echo "Switching back to the original branch '$current_branch'."
 git checkout "$current_branch"
+
+# Add the readme-info file in the original branch and commit if it has changed
+echo "Checking if $OUTPUT_FILE has changed in the original branch."
+if ! git diff --quiet -- "$OUTPUT_FILE"; then
+    echo "Changes detected in $OUTPUT_FILE on $current_branch. Adding and committing changes."
+    git add "$OUTPUT_FILE"
+    git commit -m "Include $OUTPUT_FILE with updated information"
+else
+    echo "No changes detected in $OUTPUT_FILE on $current_branch. Nothing to commit."
+fi
+
+# Remove the readme-info file
+echo "Removing the $OUTPUT_FILE file from the working directory."
+rm -f "$OUTPUT_FILE"
 
 # Apply stashed changes if any were stashed
 if [ "$stash_applied" = true ]; then
