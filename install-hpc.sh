@@ -50,7 +50,16 @@ mkdir -p "$HOME/.local/bin"
 
 # Convert line endings and make files executable in dotfiles repo
 echo "Ensuring Unix line endings and executability in dotfiles repository..."
-find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec dos2unix {} + -exec chmod +x {} +
+
+# Check if dos2unix is available
+if command -v dos2unix &> /dev/null; then
+    echo "Converting line endings to Unix format..."
+    find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec dos2unix {} +
+fi
+
+# Make files executable
+echo "Making files executable..."
+find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec chmod +x {} +
 
 # Copy files from dotfiles repo to ~/.local/bin and ~/.bashrc.d
 echo "Copying scripts to ~/.local/bin and bashrc.d files to ~/.bashrc.d..."
