@@ -21,6 +21,7 @@ export APPTAINER_CACHE_DIR=/scratch/"$USER"/.cache/apptainer
 # force renv to use /scrach
 export XDG_CACHE_HOME=/scratch/"$USER"/.cache
 export RENV_PATHS_ROOT=/scratch/"$USER"/.local/renv
+mkdir -p "$RENV_PATHS_ROOT"
 
 # force R to use scratch
 export R_LIBS="/scratch/$USER/.local/lib/R"
