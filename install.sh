@@ -35,8 +35,8 @@ clone_repo() {
   echo "Cloning GitHub repository"
   # Clone the specified GitHub repository into a temporary directory
   TMP_DIR=$(mktemp -d)
-  git clone https://github.com/MiguelRodo/dotfiles "$TMP_DIR"
-  echo "Successfully cloned GitHub repository MiguelRodo/dotfiles"
+  git clone https://github.com/SATVILab/dotfiles "$TMP_DIR"
+  echo "Successfully cloned GitHub repository SATVILab/dotfiles"
 }
 
 # Function to configure the user's bin directories and update PATH
@@ -78,13 +78,6 @@ cp -r "$TMP_DIR/scripts/" "$HOME/.local/bin" # Copy scripts to ~/.local/bin
 rm -rf "$TMP_DIR" # Remove the temporary directory after use
 
 config_bashrc_d
-
-# Check if running in a GitHub Codespace for the user 'MiguelRodo'
-if [[ "$GITHUB_USER" == "MiguelRodo" && "$CODESPACES" == "true" ]]; then
-    echo "Running script in a Codespace for user MiguelRodo"
-    # Example: Replace this line with any additional script you want to run in Codespaces
-    install-jetbrains-font
-fi
 
 if [ -f "$HOME/install-hpc.sh" ]; then
   rm "$HOME/install-hpc.sh"
