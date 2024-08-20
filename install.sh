@@ -74,7 +74,7 @@ codespaces_setup() {
   if [[ "$CODESPACES" == "true" ]]; then
       echo "Running in a GitHub Codespace"
       # Example: Replace this line with any additional script you want to run in Codespaces
-      # install-jetbrains-font
+      install-jetbrains-font
   fi
 }
 
