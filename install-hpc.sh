@@ -61,10 +61,20 @@ fi
 echo "Making files executable..."
 find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec chmod +x {} +
 
-# Copy files from dotfiles repo to ~/.local/bin and ~/.bashrc.d
-echo "Copying scripts to ~/.local/bin and bashrc.d files to ~/.bashrc.d..."
+# Copy files from dotfiles repo to ~/.local/bin
+echo "Copying scripts to ~/.local/bin..."
 cp -r "$HOME/dotfiles/scripts/"* "$HOME/.local/bin/"
-cp -r "$HOME/dotfiles/bashrc.d/"* "$HOME/.bashrc.d/"
+
+# Copy files to ~/.bashrc.d, but skip login.sh if it exists
+echo "Copying bashrc.d files to ~/.bashrc.d..."
+for file in "$HOME/dotfiles/bashrc.d/"*; do
+    filename=$(basename "$file")
+    if [ "$filename" = "login.sh" ] && [ -e "$HOME/.bashrc.d/$filename" ]; then
+        echo "Skipping $filename because it already exists in ~/.bashrc.d"
+    else
+        cp "$file" "$HOME/.bashrc.d/"
+    fi
+done
 
 # Optionally copy hidden files to home directory if the -c flag is set
 if [ "$COPY_HIDDEN" = true ]; then
