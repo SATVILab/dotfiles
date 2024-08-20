@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Function to display usage
+usage() {
+    echo "Usage: $0"
+    echo ""
+    echo "Description:"
+    echo "  This script installs the JetBrains Mono font and configures it for use in VS Code."
+    echo "  It downloads the font, installs it on your system, and updates VS Code settings."
+    echo ""
+    echo "Examples:"
+    echo "  $0                          # Install JetBrains Mono and configure VS Code"
+    exit 0
+}
+
 # Install fontconfig, wget and unzip
 sudo apt-get update && sudo apt-get install -y fontconfig wget unzip jq
 

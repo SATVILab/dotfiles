@@ -5,10 +5,19 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to check (optional; defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
+    echo "  -s, --sif <sif>             : Name of the SIF file to check (defaults to the current directory name)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
+    echo ""
+    echo "Description:"
+    echo "  This script checks if a specified Apptainer Image File (SIF) exists in the given directory or"
+    echo "  in the default Apptainer cache locations. Useful for ensuring a container is available before use."
+    echo ""
+    echo "Examples:"
+    echo "  $0 -s mycontainer.sif"
+    echo "  $0 -s mycontainer.sif -d /custom/directory"
     exit 1
 }
+
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"

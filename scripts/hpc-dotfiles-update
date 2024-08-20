@@ -4,13 +4,16 @@ usage() {
     echo "Usage: $0 [-c]"
     echo "  -c                          : Copy hidden configuration files (.Renviron, .lintr, .radian_profile) to the home directory"
     echo ""
-    echo "Example: $0 -c"
+    echo "Description:"
+    echo "  This script updates the dotfiles repository on the HPC and re-runs the setup script to apply any updates."
+    echo "  It ensures your environment is consistent with the latest version of your dotfiles."
     echo ""
-    echo "Guidelines:"
-    echo "  - Use the '-c' option if you want to copy hidden configuration files to your home directory."
-    echo "  - Hidden files include .Renviron, .lintr, and .radian_profile."
+    echo "Examples:"
+    echo "  $0                          # Update dotfiles without copying hidden files"
+    echo "  $0 -c                       # Update dotfiles and copy hidden files"
     exit 0
 }
+
 
 # Parse the command-line options
 COPY_HIDDEN=false
