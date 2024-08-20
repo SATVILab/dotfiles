@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+usage() {
+    echo "Usage: $0 [-c]"
+    echo "  -c                          : Copy hidden configuration files (.Renviron, .lintr, .radian_profile) to the home directory"
+    echo ""
+    echo "Example: $0 -c"
+    echo ""
+    echo "Guidelines:"
+    echo "  - Use the '-c' option if you want to copy hidden configuration files to your home directory."
+    echo "  - Hidden files include .Renviron, .lintr, and .radian_profile."
+    exit 0
+}
+
+# Parse the command-line options
+COPY_HIDDEN=false
+while getopts "ch" opt; do
+  case ${opt} in
+    c )
+      COPY_HIDDEN=true
+      ;;
+    h )
+      usage
+      ;;
+    \? )
+      usage
+      ;;
+  esac
+done
+
+set -e
+
+ORIG_DIR="$PWD"
+PATH_DIR_DOTFILES="$HOME/dotfiles"
+echo "Updating dotfiles..."
+echo "ORIG_DIR: $ORIG_DIR"
+echo "PATH_DIR_DOTFILES: $PATH_DIR_DOTFILES"
+
+# Clone or pull the dotfiles repository
+if [ ! -d "$PATH_DIR_DOTFILES" ]; then
+    echo "Cloning dotfiles..."
+    git clone https://SATVILab/dotfiles.git "$PATH_DIR_DOTFILES"
+    echo "Dotfiles cloned"
+else
+    echo "Changing directory to $PATH_DIR_DOTFILES"
+    cd "$PATH_DIR_DOTFILES"
+    echo "Pulling dotfiles..."
+    git pull origin main
+    echo "Dotfiles pulled"
+fi
+
+# Install the dotfiles
+echo "Installing dotfiles..."
+cd $HOME
+echo "Running install-hpc.sh"
+
+if [ "$COPY_HIDDEN" = "true" ]; then
+    dotfiles/install-hpc.sh -c
+else
+    dotfiles/install-hpc.sh
+fi
+
+echo "Dotfiles installed"
+cd "$ORIG_DIR"
+echo "Dotfiles updated"
