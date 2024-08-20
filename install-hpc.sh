@@ -33,25 +33,21 @@ while getopts "ch" opt; do
 done
 
 # Ensure .bashrc sources .bashrc.d
-if [ -e "$HOME/.bashrc" ]; then 
-    if [ -z "$(grep -F bashrc.d "$HOME/.bashrc")" ]; then 
-        echo 'for i in $(ls -A $HOME/.bashrc.d/); do source $HOME/.bashrc.d/$i; done' \
-        >> "$HOME/.bashrc"
-    fi
-else
+if [ ! -e "$HOME/.bashrc" ]; then
     touch "$HOME/.bashrc"
-    echo 'for i in $(ls -A $HOME/.bashrc.d/); do source $HOME/.bashrc.d/$i; done' \
-    > "$HOME/.bashrc"
+fi
+
+if ! grep -Fq ".bashrc.d" "$HOME/.bashrc"; then 
+    echo 'for i in $HOME/.bashrc.d/*; do [ -r "$i" ] && source "$i"; done' >> "$HOME/.bashrc"
+    echo ".bashrc.d sourcing added to .bashrc."
 fi
 
 # Create directories if they don't exist
-mkdir -p "$HOME/.bashrc.d"
-mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.bashrc.d" "$HOME/.local/bin"
 
 # Convert line endings and make files executable in dotfiles repo
 echo "Ensuring Unix line endings and executability in dotfiles repository..."
 
-# Check if dos2unix is available
 if command -v dos2unix &> /dev/null; then
     echo "Converting line endings to Unix format..."
     find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec dos2unix {} +
@@ -61,11 +57,10 @@ fi
 echo "Making files executable..."
 find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec chmod +x {} +
 
-# Copy files from dotfiles repo to ~/.local/bin
+# Copy scripts and bashrc.d files
 echo "Copying scripts to ~/.local/bin..."
 cp -r "$HOME/dotfiles/scripts/"* "$HOME/.local/bin/"
 
-# Copy files to ~/.bashrc.d, but skip login.sh if it exists
 echo "Copying bashrc.d files to ~/.bashrc.d..."
 for file in "$HOME/dotfiles/bashrc.d/"*; do
     filename=$(basename "$file")
@@ -78,13 +73,13 @@ done
 
 # Optionally copy hidden files to home directory if the -c flag is set
 if [ "$COPY_HIDDEN" = true ]; then
-  echo "Copying hidden configuration files to home directory..."
-  cp "$HOME/dotfiles/.Renviron" "$HOME/"
-  cp "$HOME/dotfiles/.lintr" "$HOME/"
-  cp "$HOME/dotfiles/.radian_profile" "$HOME/"
-  echo "Hidden configuration files copied to home directory."
+    echo "Copying hidden configuration files to home directory..."
+    cp "$HOME/dotfiles/.Renviron" "$HOME/"
+    cp "$HOME/dotfiles/.lintr" "$HOME/"
+    cp "$HOME/dotfiles/.radian_profile" "$HOME/"
+    echo "Hidden configuration files copied to home directory."
 else
-  echo "Skipping copying of hidden configuration files. Use the '-c' flag to copy them."
+    echo "Skipping copying of hidden configuration files. Use the '-c' flag to copy them."
 fi
 
 # Check Git configuration
