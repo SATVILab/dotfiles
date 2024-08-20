@@ -1,6 +1,14 @@
+```markdown
 # Dotfiles Repository for HPC and GitHub Codespaces
 
 This repository provides a comprehensive setup for configuring development environments both on High-Performance Computing (HPC) clusters and GitHub Codespaces. It includes essential scripts and configurations that streamline your workflow, from setting up your environment to updating your dotfiles.
+
+## TL;DR
+
+- **HPC Users**: Clone the repo and run `install-hpc.sh` to set up your environment.
+- **Codespaces Users**: Use this repository as your dotfiles repository in your Codespaces settings.
+- **Update Dotfiles**: Use `hpc-dotfiles-update` on HPC to keep your setup current.
+- **Explore Commands**: Use the `-h` option with most scripts to see detailed help.
 
 ## Table of Contents
 
@@ -19,11 +27,7 @@ This repository provides a comprehensive setup for configuring development envir
 
 ## Summary
 
-This repository contains scripts and configurations to enhance your development environment on both HPC clusters and GitHub Codespaces. The scripts automate common tasks such as container management with Apptainer, job submission with Slurm, and environment setup. 
-
-For a quick start:
-- **HPC Users**: Clone the repo and run `dotfiles/install-hpc.sh`.
-- **Codespaces Users**: Set this repository as your dotfiles repository in your Codespaces settings.
+This repository contains scripts and configurations to enhance your development environment on both HPC clusters and GitHub Codespaces. The scripts automate common tasks such as container management with Apptainer, job submission with Slurm, and environment setup.
 
 ## Setup on HPC
 
@@ -39,8 +43,8 @@ To set up your environment on an HPC cluster:
    ```
    This script will:
    - Copy all necessary scripts to your `~/.local/bin` directory.
-   - Run the main `install.sh` script to configure your environment.
-   - Optionally copy hidden configuration files (such as `.Renviron`, `.lintr`, and `.radian_profile`) if the `-c` flag is set.
+   - Configure your environment by sourcing scripts in `.bashrc.d`.
+   - Optionally copy hidden configuration files if the `-c` flag is set.
 
 3. **Copy Hidden Files** (optional):
    To copy hidden configuration files, re-run the installation script with the `-c` flag:
@@ -50,15 +54,13 @@ To set up your environment on an HPC cluster:
 
 ## Update Dotfiles on HPC
 
-To update your dotfiles on the HPC, simply run the `dotfiles-update` script:
+To update your dotfiles on the HPC, run:
 
 ```bash
-dotfiles-update
+hpc-dotfiles-update
 ```
 
-This script will:
-- Pull the latest changes from the dotfiles repository.
-- Run the `install-hpc.sh` script to apply updates.
+This will pull the latest changes from the repository and re-run the setup script.
 
 ## Usage on GitHub Codespaces
 
@@ -69,110 +71,48 @@ To use this dotfiles repository in GitHub Codespaces:
    - Under "Codespaces", set this repository as your dotfiles repository.
 
 2. **Customize Your Environment**:
-   The `install.sh` script will automatically run in your Codespaces environment, setting up your development environment based on the configurations and scripts in this repository.
+   The `install.sh` script will automatically run in your Codespaces environment, setting up your development environment.
 
 ## Detailed Script Overview
 
 ### Apptainer Scripts
 
-**`apptainer-exists`**
-
-- **Description**: Checks if a specified Apptainer Image File (SIF) exists in the specified or default directories.
-- **Usage**:
-  ```bash
-  apptainer-exists -s mycontainer.sif
-  ```
-  If no SIF file is specified, it defaults to the current directory name.
-
-**`apptainer-pull`**
-
-- **Description**: Pulls an Apptainer image from the GitHub Container Registry and saves it locally.
-- **Usage**:
-  ```bash
-  apptainer-pull -u YourGitHubUser -r YourRepo -i image_name
-  ```
-  This script supports several optional flags for customization, such as `-f` for force, `-t` for tag, and `-b` for base directory.
-
-**`apptainer-run`**
-
-- **Description**: Runs a command inside an Apptainer container.
-- **Usage**:
-  ```bash
-  apptainer-run -s mycontainer.sif echo "Hello, World!"
-  ```
-  If no command is specified, it opens a shell inside the container.
-
-**`apptainer-run-rscript`**
-
-- **Description**: Runs an R script inside an Apptainer container.
-- **Usage**:
-  ```bash
-  apptainer-run-rscript -s mycontainer.sif "print('Hello, World!')"
-  ```
-  The command passed as an argument will be executed as an R script.
+- **`apptainer-exists`**: Checks if a specified Apptainer Image File (SIF) exists.
+- **`apptainer-pull`**: Pulls an Apptainer image from the GitHub Container Registry and saves it locally.
+- **`apptainer-run`**: Runs a command inside an Apptainer container.
+- **`apptainer-run-rscript`**: Runs an R script inside an Apptainer container.
 
 ### Slurm Scripts
 
-**`slurm-sintx`**
-
-- **Description**: Submits a job to the Slurm workload manager with a default of 2 tasks.
-- **Usage**:
-  ```bash
-  slurm-sintx 4
-  ```
-  This command submits a job with 4 tasks. If no number is specified, it defaults to 2 tasks.
-
-**`slurm-squeue`**
-
-- **Description**: Displays the Slurm queue for the current user.
-- **Usage**:
-  ```bash
-  slurm-squeue
-  ```
-  This command runs `squeue -u $USER` to show your queued jobs.
+- **`slurm-sintx`**: Submits a job to Slurm with a specified number of tasks (default is 2).
+- **`slurm-squeue`**: Displays the Slurm queue for the current user.
 
 ### Utility Scripts
 
-**`dotfiles-update`**
-
-- **Description**: Updates the dotfiles repository on the HPC and re-runs the setup.
-- **Usage**:
-  ```bash
-  dotfiles-update
-  ```
-  This will pull the latest changes from the dotfiles repository and re-run the `install-hpc.sh` script.
-
-**`install-jetbrains-font`**
-
-- **Description**: Installs the JetBrains Mono font on your system, and configures it for use in VS Code.
-- **Usage**:
-  ```bash
-  install-jetbrains-font
-  ```
-  This script downloads, installs, and configures the JetBrains Mono font.
+- **`hpc-dotfiles-update`**: Updates the dotfiles repository on the HPC and re-runs the setup.
+- **`install-jetbrains-font`**: Installs the JetBrains Mono font and configures it for use in VS Code.
 
 ## Dotfiles Overview
 
 ### `.Renviron`
 
-- **Purpose**: Contains environment variables for R projects, including GitHub username and project-specific variables.
+- Contains environment variables for R projects.
 
 ### `.gitconfig`
 
-- **Purpose**: Configures Git to handle line endings correctly with `autocrlf=input`.
+- Configures Git to handle line endings with `autocrlf=input`.
 
 ### `.radian_profile`
 
-- **Purpose**: Configures the Radian REPL, specifically to disable auto-matching of parentheses.
+- Configures the Radian REPL, disabling auto-matching of parentheses.
 
 ### `.lintr`
 
-- **Purpose**: Configures `lintr` to disable specific linters for R code, such as object name and length checks.
+- Configures `lintr` to disable specific linters for R code.
 
 ## Additional Resources
-
-For more information on using dotfiles, Apptainer, or Slurm, you can check out these resources:
 
 - [Dotfiles Guide](https://dotfiles.github.io/)
 - [Apptainer Documentation](https://apptainer.org/docs/)
 - [Slurm User Guide](https://slurm.schedmd.com/documentation.html)
+```
