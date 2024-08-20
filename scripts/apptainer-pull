@@ -8,11 +8,19 @@ usage() {
     echo "  -u, --user <github_user>   : GitHub username (required)"
     echo "  -r, --repo <github_repo>   : GitHub repository (optional, defaults to the current directory name)"
     echo "  -p, --password <password>  : Password or token (optional, defaults to GH_TOKEN, GITHUB_TOKEN, or GITHUB_PAT environment variables)"
-    echo "  -i, --image <image_name>   : Image name (optional, defaults to the repository name, forced to lowercase)"
-    echo "  -n, --sif <sif_name>       : SIF file name (optional, defaults to the repository name, forced to lowercase and ending with .sif)"
+    echo "  -i, --image <image_name>   : Image name (optional, defaults to the repository name)"
+    echo "  -n, --sif <sif_name>       : SIF file name (optional, defaults to the repository name ending with .sif)"
     echo "  -t, --tag <tag>            : Tag (optional, defaults to 'latest')"
-    echo "  -b, --base_dir <base_dir>  : Base directory for storing the SIF file (optional, defaults to \$APPTAINER_CACHE_DIR if set)"
-    echo "  -f, --force                : Force download and overwrite existing SIF file (defaults to false)"
+    echo "  -b, --base_dir <base_dir>  : Base directory for storing the SIF file (optional, defaults to standard Apptainer cache directories)"
+    echo "  -f, --force                : Force download and overwrite existing SIF file"
+    echo ""
+    echo "Description:"
+    echo "  This script pulls an Apptainer image from the GitHub Container Registry and saves it locally as a SIF file."
+    echo "  It uses the provided GitHub credentials and repository information to locate and download the image."
+    echo ""
+    echo "Examples:"
+    echo "  $0 -u yourusername -r yourrepo -i image_name -t latest"
+    echo "  $0 -u yourusername -n customname.sif -b /custom/directory"
     exit 1
 }
 

@@ -6,13 +6,19 @@ set -e
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  <command>                   : Custom command to run inside the container (optional, defaults to shell)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
+    echo "  <command>                   : Custom command to run inside the container (optional, defaults to opening a shell)"
     echo ""
-    echo "Example: $0 -s mycontainer echo \"Hello, World!\""
-    echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
+    echo "Description:"
+    echo "  This script runs a command inside an Apptainer container. If no command is provided,"
+    echo "  it opens an interactive shell within the container."
+    echo ""
+    echo "Examples:"
+    echo "  $0 -s mycontainer.sif echo 'Hello, World!'"
+    echo "  $0 -d /custom/directory -s mycontainer.sif"
     exit 0
 }
+
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"

@@ -7,19 +7,17 @@ usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  <command>                   : Custom command to run with Rscript."
+    echo "  <command>                   : Custom command to run with Rscript (enclose in single quotes to avoid issues with special characters)"
     echo ""
-    echo "Example: $0 -s mycontainer 'print(\"abc\")'"
+    echo "Description:"
+    echo "  This script runs an R script inside an Apptainer container. The command passed as an argument"
+    echo "  will be executed as an R script inside the specified container."
     echo ""
-    echo "Guidelines:"
-    echo "  - Always enclose your command inside single quotes if it contains special characters."
-    echo "  - Use double quotes within the command for strings or characters, e.g.:"
-    echo "    $0 -s mycontainer 'print(\"abc\")'"
-    echo "  - Avoid escaping quotes unnecessarily; keep the command simple."
-    echo "  - It is good practice to always enclose your command in single quotes."
+    echo "Examples:"
+    echo "  $0 -s mycontainer.sif 'print(\"Hello, World!\")'"
+    echo "  $0 -d /custom/directory -s mycontainer.sif 'summary(data)'"
     exit 0
 }
-
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
