@@ -1,4 +1,3 @@
-```markdown
 # Dotfiles Repository for HPC and GitHub Codespaces
 
 This repository provides a comprehensive setup for configuring development environments both on High-Performance Computing (HPC) clusters and GitHub Codespaces. It includes essential scripts and configurations that streamline your workflow, from setting up your environment to updating your dotfiles.
@@ -115,4 +114,4 @@ To use this dotfiles repository in GitHub Codespaces:
 - [Dotfiles Guide](https://dotfiles.github.io/)
 - [Apptainer Documentation](https://apptainer.org/docs/)
 - [Slurm User Guide](https://slurm.schedmd.com/documentation.html)
-```
+
