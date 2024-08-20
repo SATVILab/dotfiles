@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Exit early if /scratch/$USER directory does not exist
+if [ ! -d "/scratch/$USER" ]; then
+    echo "/scratch/$USER directory does not exist. Exiting script."
+    exit 0
+fi
+
 # use XDG relative directories, but
 # relative to /scratch/$USER
 export XDG_DATA_HOME=/scratch/"$USER"/.local/share
