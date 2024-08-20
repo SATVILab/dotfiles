@@ -67,7 +67,7 @@ if [ -z "$SIF_NAME" ]; then
     else
         SIF_NAME="${REPO,,}.sif"
     fi
-    SIF_NAME=$(echo "$SIF_NAME" | sed 's/^[ \t]*//;s/[ \t]*$//;s/[ \t]*//g')
+    SIF_NAME=$(echo "$SIF_NAME" | tr -d '[:space:]')
 fi
 
 # Determine the base directory if not provided
