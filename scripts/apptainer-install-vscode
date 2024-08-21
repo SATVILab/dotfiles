@@ -4,35 +4,43 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-m <metadata_command>] [-b <base_dir>]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-m <metadata_command>] [-b <base_dir>]"
+    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
     echo "  -m, --metadata-command <metadata_command> : Command to retrieve unique metadata from the image (default: 'uname -r')"
-    echo "  -b, --base-dir <base_dir>                 : Base directory for installation (default: \$APPTAINER_CACHE_DIR/vscode/<unique_id>, or /scratch/\$USER/.local/share/vscode/<unique_id> if APPTAINER_CACHE_DIR is not set)"
+    echo "  -b, --base-dir <base_dir>   : Base directory for installation (default: \$APPTAINER_CACHE_DIR/vscode/<unique_id>)"
     echo ""
     echo "Description:"
     echo "  This script installs Visual Studio Code CLI inside a unique sub-directory for each Apptainer image,"
     echo "  based on metadata from the image, ensuring isolated installations for each image."
     echo ""
     echo "Examples:"
-    echo "  $0"
-    echo "  $0 -m 'uname -r' -b \$APPTAINER_CACHE_DIR/vscode"
+    echo "  $0 -s myimage.sif -m 'uname -r' -b \$APPTAINER_CACHE_DIR/vscode"
     exit 1
 }
 
 # Default values
 metadata_command="uname -r"
+SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+DIRECTORY=""
 base_dir=""
 
 # Parse named parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
+        -s|--sif) SIF_FILE="$2"; shift 2 ;;
+        -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -m|--metadata-command) metadata_command="$2"; shift 2 ;;
         -b|--base-dir) base_dir="$2"; shift 2 ;;
         -h|--help) usage ;;
         --) shift; break ;;
-        -*|--*) echo "Unknown option: $1"; usage ;;
-        *) echo "Unknown argument: $1"; usage ;;
+        -*|--*) usage ;;
+        *) break ;;
     esac
 done
+
+# Ensure the SIF_FILE ends with .sif and convert to lowercase
+SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
 
 # Determine the base directory
 if [ -n "$APPTAINER_CACHE_DIR" ]; then
@@ -43,8 +51,8 @@ else
     base_dir="${base_dir:-$HOME/.local/share/vscode}"
 fi
 
-# Get unique identifier from the image metadata
-unique_id=$(eval "$metadata_command")
+# Generate unique identifier from the image metadata
+unique_id=$(apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$metadata_command")
 if [ -z "$unique_id" ]; then
     echo "Error: Failed to retrieve unique identifier from the image."
     exit 1
@@ -80,10 +88,18 @@ if ! mv "$tmp_dir/VSCode-linux-x64"/* "$install_dir"; then
     exit 1
 fi
 
+# Create a `bin` directory within the image-specific install directory
+mkdir -p "$install_dir/bin"
+
+# Create symbolic links for code and code-tunnel in the image-specific `bin` directory
+ln -sf "$install_dir/bin/code" "$install_dir/bin/code"
+ln -sf "$install_dir/bin/code-tunnel" "$install_dir/bin/code-tunnel"
+
 # Clean up the temporary directory
 echo "Cleaning up temporary files..."
 rm -rf "$tmp_dir"
 
 echo "Installation complete!"
 echo "VSCode is installed in: $install_dir"
+echo "The 'code' and 'code-tunnel' executables are available in: $install_dir/bin"
 echo "To verify, you can run: $install_dir/bin/code --version"
