@@ -20,6 +20,7 @@ usage() {
 
 # Default values
 metadata_command="uname -r"
+base_dir=""
 
 # Parse named parameters
 while [[ "$#" -gt 0 ]]; do
@@ -35,11 +36,11 @@ done
 
 # Determine the base directory
 if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    base_dir="$APPTAINER_CACHE_DIR/vscode"
+    base_dir="${base_dir:-$APPTAINER_CACHE_DIR/vscode}"
 elif [ -d "/scratch/$USER" ]; then
-    base_dir="/scratch/$USER/.local/share/vscode"
+    base_dir="${base_dir:-/scratch/$USER/.local/share/vscode}"
 else
-    base_dir="$HOME/.local/share/vscode"
+    base_dir="${base_dir:-$HOME/.local/share/vscode}"
 fi
 
 # Get unique identifier from the image metadata
