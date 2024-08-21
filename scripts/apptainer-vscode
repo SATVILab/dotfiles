@@ -50,9 +50,7 @@ elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
 elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
     SIF_PATH="$HOME_DIR/$SIF_FILE"
 else
-    log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "To view the log file, run:"
-    echo "cat $log_file"
+    echo "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
     exit 1
 fi
 
