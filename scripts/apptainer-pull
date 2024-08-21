@@ -157,7 +157,13 @@ fi
 # Function to build Apptainer image
 build_apptainer() {
     local organisation="${ORG:-$USER}"
-    local image_uri="docker://${REGISTRY_HOSTNAME}/${organisation}/${REPO}:${TAG}"
+    organisation="${organisation,,}"
+    if [ "$REGISTRY" == "ghcr" ]; then
+        local repo="${REPO,,}"
+    else
+        local repo="$REPO"
+    fi
+    local image_uri="docker://${REGISTRY_HOSTNAME}/${organisation}/${repo}:${TAG}"
     
     log "Building Apptainer image '$SIF_FILE' from Docker image '$image_uri'"
     apptainer build --force "$SIF_FILE" "$image_uri"
