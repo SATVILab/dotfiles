@@ -4,13 +4,13 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-base-dir <path>] [--cli-data-dir <path>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-base-dir <path>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
     echo "  --cli-base-dir <path>       : Base directory for VSCode CLI installation (optional; defaults to \$APPTAINER_CACHE_DIR/vscode/<unique_id>)"
     echo ""
-    echo "Example: $0 -s mycontainer --clean --cli-data-dir /custom/path"
+    echo "Example: $0 -s mycontainer --clean"
     echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
     exit 1
 }
@@ -39,34 +39,8 @@ done
 # Ensure the SIF_FILE ends with .sif and convert to lowercase
 SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
 
-# Determine the CLI base directory
-if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    CLI_BASE_DIR="${CLI_BASE_DIR:-$APPTAINER_CACHE_DIR/vscode/$unique_id}"
-elif [ -d "/scratch/$USER" ]; then
-    CLI_BASE_DIR="${CLI_BASE_DIR:-/scratch/$USER/.local/share/vscode/$unique_id}"
-else
-    CLI_BASE_DIR="${CLI_BASE_DIR:-$HOME/.local/share/vscode/$unique_id}"
-fi
-CLI_INSTALL_DIR="$CLI_BASE_DIR/install/"
-CLI_DATA_DIR="$CLI_BASE_DIR/data/"
-
-# Create directories if they don't exist
-mkdir -p "$CLI_BASE_DIR"
-mkdir -p "$CLI_INSTALL_DIR"
-mkdir -p "$CLI_DATA_DIR"
-
-# Create a log directory and log file
-SIF_FILE_BASENAME=$(basename "$SIF_FILE")
-log_dir="${CLI_BASE_DIR}/logs"
-mkdir -p "$log_dir"
-log_file="$log_dir/vscode_log_$(date '+%Y%m%d_%H%M%S').txt"
-
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
-}
-
 # Determine the full path of the SIF file
+SIF_PATH=""
 if [ -n "$DIRECTORY" ]; then
     SIF_PATH="$DIRECTORY/$SIF_FILE"
 fi
@@ -84,12 +58,44 @@ if [ ! -f "$SIF_PATH" ]; then
 fi
 
 if [ ! -f "$SIF_PATH" ]; then
-    log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
+    echo "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
     exit 1
 fi
 
 # Generate a unique identifier based on image metadata
 unique_id=$(apptainer exec "$SIF_PATH" uname -r | tr -d '[:space:]')
+
+# Ensure unique_id is set correctly
+if [ -z "$unique_id" ]; then
+    echo "Error: Failed to retrieve unique identifier from the image."
+    exit 1
+fi
+
+# Determine the CLI base directory
+if [ -n "$APPTAINER_CACHE_DIR" ]; then
+    CLI_BASE_DIR="${CLI_BASE_DIR:-$APPTAINER_CACHE_DIR/vscode/$unique_id}"
+elif [ -d "/scratch/$USER" ]; then
+    CLI_BASE_DIR="${CLI_BASE_DIR:-/scratch/$USER/.local/share/vscode/$unique_id}"
+else
+    CLI_BASE_DIR="${CLI_BASE_DIR:-$HOME/.local/share/vscode/$unique_id}"
+fi
+
+CLI_INSTALL_DIR="$CLI_BASE_DIR/install"
+CLI_DATA_DIR="$CLI_BASE_DIR/data"
+CLI_LOG_DIR="$CLI_BASE_DIR/logs"
+
+# Create directories if they don't exist
+mkdir -p "$CLI_INSTALL_DIR"
+mkdir -p "$CLI_DATA_DIR"
+mkdir -p "$CLI_LOG_DIR"
+
+# Create a log file
+log_file="$CLI_LOG_DIR/vscode_log_$(date '+%Y%m%d_%H%M%S').txt"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+}
 
 # Log the parsed options
 log "Options:"
