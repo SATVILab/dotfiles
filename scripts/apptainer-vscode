@@ -123,7 +123,7 @@ else
 fi
 
 # Prepare the command for running inside the container
-COMMANDS='export PATH="$CLI_INSTALL_DIR/VSCode-linux-x64:$PATH"; '
+COMMANDS='export PATH="$CLI_INSTALL_DIR/VSCode-linux-x64:$CLI_INSTALL_DIR/VSCode-linux-x64/bin:$PATH"; '
 COMMANDS+='if [ -f /etc/profile ]; then source /etc/profile; fi; '
 COMMANDS+='if [ -f '"$HOME"'/.bashrc ]; then source '"$HOME"'/.bashrc; fi; '
 
