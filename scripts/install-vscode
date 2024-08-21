@@ -7,6 +7,7 @@ usage() {
     echo "Usage: $0 [-d <install_dir>] [-b <bin_dir>]"
     echo "  -d, --install-dir <install_dir> : Directory to install VSCode (default: \$HOME/.vscode-linux-x64)"
     echo "  -b, --bin-dir <bin_dir>         : Directory to place symbolic links for code and code-tunnel (default: \$HOME/.local/bin)"
+    echo "  -n, --no-link                   : If set, no symbolic links are created"
     echo ""
     echo "Description:"
     echo "  This script downloads and installs Visual Studio Code in a specified directory,"
@@ -21,12 +22,14 @@ usage() {
 # Default values
 install_dir="$HOME/.vscode-linux-x64"
 bin_dir="$HOME/.local/bin"
+create_link=true
 
 # Parse named parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -d|--install-dir) install_dir="$2"; shift 2 ;;
         -b|--bin-dir) bin_dir="$2"; shift 2 ;;
+        -n|--no-link) create_link=false; shift ;; 
         -h|--help) usage ;;
         --) shift; break ;;
         -*|--*) echo "Unknown option: $1"; usage ;;
@@ -62,9 +65,11 @@ if ! mv "$tmp_dir/VSCode-linux-x64" "$install_dir"; then
 fi
 
 # Create symbolic links to the executables in bin_dir
-echo "Creating symbolic links in: $bin_dir"
-ln -sf "$install_dir/bin/code" "$bin_dir/code"
-ln -sf "$install_dir/bin/code-tunnel" "$bin_dir/code-tunnel"
+if [ "$create_link" == "true" ]; then
+    echo "Creating symbolic links in: $bin_dir"
+    ln -sf "$install_dir/bin/code" "$bin_dir/code"
+    ln -sf "$install_dir/bin/code-tunnel" "$bin_dir/code-tunnel"
+fi
 
 # Clean up the temporary directory
 echo "Cleaning up temporary files..."
