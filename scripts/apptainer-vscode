@@ -148,4 +148,4 @@ trap 'cleanup' EXIT
 
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
-apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$COMMANDS"
+apptainer exec "$SIF_PATH" -- bash -c "'$COMMANDS'"
