@@ -64,7 +64,7 @@ fi
 
 
 # Generate the log file name based on the current date and time
-LOG_FILE="$LOG_DIR/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+LOG_FILE="$LOG_DIR/run_log_$(basename "$SLURM_SCRIPT")_$(date '+%Y%m%d_%H%M%S').txt"
 
 # Copy the contents of the sbatch script over to the log file
 {
