@@ -115,6 +115,21 @@ log "  Log File: $log_file"
 # Install VSCode if it doesn't exist
 if [ ! -f "$PATH_CLI" ]; then
     log "VSCode CLI not found, installing..."
+    # Check if the CLI install directory exists
+    if [ -d "$CLI_INSTALL_DIR" ]; then
+        # Check if 'code' command exists
+        if command -v code > /dev/null 2>&1; then
+            # Kill any running VSCode tunnels
+            code tunnel kill || true
+            sleep 1
+            code tunnel prune || true
+        fi
+        # Remove the existing installation directory
+        rm -rf "$CLI_INSTALL_DIR"
+    fi
+
+    # Create the install directory
+    mkdir -p "$CLI_INSTALL_DIR"
     apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -d "$CLI_INSTALL_DIR" -n
 else
     # Update VSCode CLI if needed
