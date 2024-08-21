@@ -4,21 +4,25 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-data-dir <path>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-bin-dir <path>] [--cli-install-dir <path>] [--cli-data-dir <path>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
+    echo "  --cli-bin-dir <path>        : Directory for the VSCode CLI (optional; defaults to \$HOME/.local/bin)"
+    echo "  --cli-install-dir <path>    : Directory to install VSCode CLI, if needed (optional; defaults to \$HOME/.vscode-linux-x64)"
     echo "  --cli-data-dir <path>       : Path to the CLI data directory (optional; defaults to /scratch/\$USER/.local/share/Code if it exists, otherwise \$HOME/.local/share/Code)"
     echo ""
     echo "Example: $0 -s mycontainer --clean --cli-data-dir /custom/path"
     echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
-    exit 0
+    exit 1
 }
 
 # Initialize default values
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CLEAN=false
+CLI_BIN_DIR="$HOME/.local/bin"
+CLI_INSTALL_DIR="$HOME/.vscode-linux-x64"
 CLI_DATA_DIR=""
 CUSTOM_COMMAND=""
 
@@ -28,6 +32,8 @@ while [[ "$#" -gt 0 ]]; do
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -c|--clean) CLEAN=true; shift ;;
+        --cli-bin-dir) CLI_BIN_DIR="$2"; shift 2 ;;
+        --cli-install-dir) CLI_INSTALL_DIR="$2"; shift 2 ;;
         --cli-data-dir) CLI_DATA_DIR="$2"; shift 2 ;;
         -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND="$@"; break ;;
@@ -82,9 +88,21 @@ log "  SIF File: $SIF_FILE"
 log "  Directory: $DIRECTORY"
 log "  Clean: $CLEAN"
 log "  CLI Data Directory: $CLI_DATA_DIR"
+log "  CLI Install Directory: $CLI_INSTALL_DIR"
+log "  CLI Bin Directory: $CLI_BIN_DIR"
 log "  Scratch Directory: $SCRATCH_DIR"
 log "  Home Directory: $HOME_DIR"
 log "  Log File: $log_file"
+
+# Install VSCode if it doesn't exist
+if ! command -v "$CLI_BIN_DIR/code" &> /dev/null; then
+    log "VSCode CLI not found, installing..."
+    install-vscode -b "$CLI_BIN_DIR" -d "$CLI_INSTALL_DIR"
+else
+    # Update VSCode CLI if needed
+    log "Updating VSCode CLI..."
+    "$CLI_BIN_DIR/code" update
+fi
 
 # Check if the SIF file exists
 if ! apptainer-exists ${SIF_FILE:+-s "$SIF_FILE"} ${DIRECTORY:+-d "$DIRECTORY"}; then
@@ -100,18 +118,18 @@ COMMANDS+='if [ -f '"$HOME"'/.bashrc ]; then source '"$HOME"'/.bashrc; fi; '
 
 # Clean up existing tunnels if requested
 if [ "$CLEAN" = true ]; then
-    COMMANDS+="(code tunnel kill || true); sleep 2; "
-    COMMANDS+="(code tunnel prune || true); sleep 2; "
-    COMMANDS+="(code tunnel unregister || true); sleep 2; "
+    COMMANDS+="($CLI_BIN_DIR/code tunnel kill || true); sleep 2; "
+    COMMANDS+="($CLI_BIN_DIR/code tunnel prune || true); sleep 2; "
+    COMMANDS+="($CLI_BIN_DIR/code tunnel unregister || true); sleep 2; "
 fi
 
 # Add the command to start VS Code tunnel
-COMMANDS+="/usr/local/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
+COMMANDS+="$CLI_BIN_DIR/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 log "COMMANDS: $COMMANDS"
 
 cleanup() {
     echo "Stopping currently running tunnels"
-    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "code tunnel kill"
+    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$CLI_BIN_DIR/code tunnel kill"
     echo "Stopped currently running terminals"
 }
 
@@ -120,4 +138,3 @@ trap 'cleanup' EXIT
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
 apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$COMMANDS"
-
