@@ -43,23 +43,27 @@ done
 SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
 
 # Generate a unique identifier based on image metadata
-unique_id=$(apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "uname -r") # or use another command if needed
+unique_id=$(apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "uname -r")
 unique_id="${unique_id// /_}"  # Replace spaces with underscores
 
 # Determine the CLI base directory
 if [ -n "$APPTAINER_CACHE_DIR" ]; then
     CLI_BASE_DIR="${CLI_BASE_DIR:-$APPTAINER_CACHE_DIR/vscode/$unique_id}"
+    CLI_INSTALL_DIR="$APPTAINER_CACHE_DIR/vscode/install/$unique_id"
     CLI_DATA_DIR="${CLI_DATA_DIR:-$APPTAINER_CACHE_DIR/vscode_data/$unique_id}"
 elif [ -d "/scratch/$USER" ]; then
     CLI_BASE_DIR="${CLI_BASE_DIR:-/scratch/$USER/.local/share/vscode/$unique_id}"
+    CLI_INSTALL_DIR="/scratch/$USER/.local/share/vscode/install/$unique_id"
     CLI_DATA_DIR="${CLI_DATA_DIR:-/scratch/$USER/.local/share/vscode_data/$unique_id}"
 else
     CLI_BASE_DIR="${CLI_BASE_DIR:-$HOME/.local/share/vscode/$unique_id}"
+    CLI_INSTALL_DIR="$HOME/.local/share/vscode/install/$unique_id"
     CLI_DATA_DIR="${CLI_DATA_DIR:-$HOME/.local/share/vscode_data/$unique_id}"
 fi
 
 # Create directories if they don't exist
 mkdir -p "$CLI_BASE_DIR"
+mkdir -p "$CLI_INSTALL_DIR"
 mkdir -p "$CLI_DATA_DIR"
 
 # Create a log directory and log file
@@ -79,6 +83,7 @@ log "  SIF File: $SIF_FILE"
 log "  Directory: $DIRECTORY"
 log "  Clean: $CLEAN"
 log "  CLI Base Directory: $CLI_BASE_DIR"
+log "  CLI Install Directory: $CLI_INSTALL_DIR"
 log "  CLI Data Directory: $CLI_DATA_DIR"
 log "  Unique ID: $unique_id"
 log "  Log File: $log_file"
@@ -86,7 +91,7 @@ log "  Log File: $log_file"
 # Install VSCode if it doesn't exist
 if [ ! -f "$CLI_BASE_DIR/bin/code" ]; then
     log "VSCode CLI not found, installing..."
-    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "apptainer-install-vscode -b \"$CLI_BASE_DIR\""
+    "$HOME/.local/bin/install-vscode" -b "$CLI_BASE_DIR/bin" -d "$CLI_INSTALL_DIR"
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
