@@ -59,7 +59,7 @@ fi
 # Generate a unique identifier based on image metadata
 unique_id=$(apptainer exec "$SIF_PATH" uname -r | tr -d '[:space:]')
 
-# Determine the CLI base directory
+# Determine the CLI base directory and related paths
 if [ -n "$APPTAINER_CACHE_DIR" ]; then
     CLI_BASE_DIR="${CLI_BASE_DIR:-$APPTAINER_CACHE_DIR/vscode/$unique_id}"
     CLI_INSTALL_DIR="$APPTAINER_CACHE_DIR/vscode/install/$unique_id"
@@ -80,7 +80,6 @@ mkdir -p "$CLI_INSTALL_DIR"
 mkdir -p "$CLI_DATA_DIR"
 
 # Create a log directory and log file
-SIF_FILE_BASENAME=$(basename "$SIF_FILE")
 log_dir="${CLI_BASE_DIR}/logs"
 mkdir -p "$log_dir"
 log_file="$log_dir/vscode_log_$(date '+%Y%m%d_%H%M%S').txt"
@@ -104,11 +103,11 @@ log "  Log File: $log_file"
 # Install VSCode if it doesn't exist
 if [ ! -f "$CLI_BASE_DIR/bin/code" ]; then
     log "VSCode CLI not found, installing..."
-    "$HOME/.local/bin/install-vscode" -b "$CLI_BASE_DIR/bin" -d "$CLI_INSTALL_DIR"
+    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -b "$CLI_BASE_DIR/bin" -d "$CLI_INSTALL_DIR"
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
-    "$CLI_BASE_DIR/bin/code" update
+    apptainer exec "$SIF_PATH" "$CLI_BASE_DIR/bin/code" update
 fi
 
 # Prepare the command for running inside the container
