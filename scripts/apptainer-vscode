@@ -85,7 +85,7 @@ CLI_DATA_DIR="$CLI_BASE_DIR/data"
 CLI_LOG_DIR="$CLI_BASE_DIR/logs"
 
 # get path to binary
-PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/bin/code"
+PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/code"
 
 # Create directories if they don't exist
 mkdir -p "$CLI_INSTALL_DIR"
@@ -135,7 +135,7 @@ if [ "$CLEAN" == "true" ]; then
 fi
 
 # Add the command to start VS Code tunnel
-COMMANDS+="$PATH_CLI tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
+COMMANDS+="\"$PATH_CLI\" tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 log "COMMANDS: $COMMANDS"
 
 cleanup() {
