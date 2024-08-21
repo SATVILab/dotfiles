@@ -109,8 +109,15 @@ fi
 COMMANDS+="/usr/local/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 log "COMMANDS: $COMMANDS"
 
+cleanup() {
+    echo "Stopping currently running tunnels"
+    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "code tunnel kill"
+    echo "Stopped currently running terminals"
+}
+
+trap 'cleanup' EXIT
+
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
 apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$COMMANDS"
 
-log "VS Code tunnel started successfully"
