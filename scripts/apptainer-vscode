@@ -120,6 +120,7 @@ else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
     apptainer exec "$SIF_PATH" "$PATH_CLI" update
+    log "Update complete"
 fi
 
 # Prepare the command for running inside the container
@@ -148,4 +149,4 @@ trap 'cleanup' EXIT
 
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
-apptainer exec "$SIF_PATH" bash -c "'$COMMANDS'"
+apptainer exec "$SIF_PATH" bash -c "$COMMANDS"
