@@ -84,6 +84,9 @@ CLI_INSTALL_DIR="$CLI_BASE_DIR/install"
 CLI_DATA_DIR="$CLI_BASE_DIR/data"
 CLI_LOG_DIR="$CLI_BASE_DIR/logs"
 
+# get path to binary
+PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/bin/code"
+
 # Create directories if they don't exist
 mkdir -p "$CLI_INSTALL_DIR"
 mkdir -p "$CLI_DATA_DIR"
@@ -105,17 +108,18 @@ log "  Clean: $CLEAN"
 log "  CLI Base Directory: $CLI_BASE_DIR"
 log "  CLI Install Directory: $CLI_INSTALL_DIR"
 log "  CLI Data Directory: $CLI_DATA_DIR"
+log "  Path to CLI: $PATH_CLI"
 log "  Unique ID: $unique_id"
 log "  Log File: $log_file"
 
 # Install VSCode if it doesn't exist
-if [ ! -f "$CLI_INSTALL_DIR/bin/code" ]; then
+if [ ! -f "$PATH_CLI" ]; then
     log "VSCode CLI not found, installing..."
     apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -d "$CLI_INSTALL_DIR" -n
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
-    apptainer exec "$SIF_PATH" "$CLI_INSTALL_DIR/bin/code" update
+    apptainer exec "$SIF_PATH" "$PATH_CLI" update
 fi
 
 # Prepare the command for running inside the container
@@ -125,18 +129,18 @@ COMMANDS+='if [ -f '"$HOME"'/.bashrc ]; then source '"$HOME"'/.bashrc; fi; '
 
 # Clean up existing tunnels if requested
 if [ "$CLEAN" = true ]; then
-    COMMANDS+="($CLI_INSTALL_DIR/bin/code tunnel kill || true); sleep 2; "
-    COMMANDS+="($CLI_INSTALL_DIR/bin/code tunnel prune || true); sleep 2; "
-    COMMANDS+="($CLI_INSTALL_DIR/bin/code tunnel unregister || true); sleep 2; "
+    COMMANDS+="($PATH_CLI tunnel kill || true); sleep 2; "
+    COMMANDS+="($PATH_CLI tunnel prune || true); sleep 2; "
+    COMMANDS+="($PATH_CLI tunnel unregister || true); sleep 2; "
 fi
 
 # Add the command to start VS Code tunnel
-COMMANDS+="$CLI_INSTALL_DIR/bin/code tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
+COMMANDS+="$PATH_CLI tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
 log "COMMANDS: $COMMANDS"
 
 cleanup() {
     echo "Stopping currently running tunnels"
-    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$CLI_INSTALL_DIR/bin/code tunnel kill"
+    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$PATH_CLI tunnel kill"
     echo "Stopped currently running tunnels"
 }
 
