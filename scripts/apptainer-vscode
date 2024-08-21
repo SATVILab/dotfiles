@@ -85,7 +85,7 @@ CLI_DATA_DIR="$CLI_BASE_DIR/data"
 CLI_LOG_DIR="$CLI_BASE_DIR/logs"
 
 # get path to binary
-PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/code"
+PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/bin/code"
 
 # Create directories if they don't exist
 mkdir -p "$CLI_INSTALL_DIR"
