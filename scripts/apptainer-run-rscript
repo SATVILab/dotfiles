@@ -14,7 +14,7 @@ usage() {
     echo "  will be executed as an R script inside the specified container."
     echo ""
     echo "Examples:"
-    echo "  $0 -s mycontainer.sif 'print(\"Hello, World!\")'"
+    echo "  $0 -s mycontainer.sif 'print(\"Hello, World\!\")'"
     echo "  $0 -d /custom/directory -s mycontainer.sif 'summary(data)'"
     exit 0
 }
@@ -57,11 +57,11 @@ fi
 SIF_FILE_BASENAME=$(basename "$SIF_FILE")
 log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
 mkdir -p "$log_dir"
-log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+log_file="$log_dir/run_rscript_log_$(date '+%Y%m%d_%H%M%S').txt"
 
 # Function to log messages
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" > "$log_file"
 }
 
 # Convert CUSTOM_COMMAND array to a single string
@@ -93,8 +93,8 @@ log "  Log File: $log_file"
 
 # Function to handle errors and log the location of the log file
 error_handler() {
-    log "An error occurred. See the log file for details: $log_file"
-    echo "To view the log file, run:"
+    log "An error occurred. See the run-rscript log file for details: $log_file"
+    echo "To view the run-rscript log file, run:"
     echo "cat $log_file"
     exit 1
 }
