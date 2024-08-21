@@ -34,12 +34,13 @@ BASE_DIR=""
 REGISTRY="ghcr"
 ORG=""
 REPO=$(basename $(pwd))
+LOGIN_USER=""
 
 # Parse named parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -R|--registry) REGISTRY="$2"; shift ;;
-        -u|--user) USER="$2"; shift ;;
+        -u|--user) LOGIN_USER="$2"; shift ;;
         -o|--org) ORG="$2"; shift ;;
         -p|--password) PASSWORD="$2"; shift ;;
         -r|--repo) REPO="$2"; shift ;;
@@ -54,8 +55,8 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Check mandatory parameters
-if [ -z "$USER" ]; then
-    echo "Error: User is required."
+if [ -z "$LOGIN_USER" ] && [ -z "$ORG" ]; then
+    echo "Error: Either user or organisation is required."
     usage
     exit 1
 fi
@@ -98,8 +99,8 @@ log() {
 # echo out all the options used
 log "Options:"
 log "  Registry: $REGISTRY"
-log "  User: $USER"
-log "  Organisation: ${ORG:-$USER}"
+log "  User: $LOGIN_USER"
+log "  Organisation: ${ORG:-$LOGIN_USER}"
 log "  Repository: $REPO"
 log "  Password: ***"
 log "  Tag: $TAG"
@@ -147,16 +148,16 @@ if [ "$REGISTRY" = "ghcr" ]; then
 fi
 
 # Log in to the registry if credentials are provided
-if [ -n "$PASSWORD" ]; then
+if [ -n "$PASSWORD" ] && [ -n "$LOGIN_USER" ]; then
     log "Logging into $REGISTRY"
-    echo "$PASSWORD" | apptainer registry login -u "$USER" --password-stdin "docker://$REGISTRY_HOSTNAME"
+    echo "$PASSWORD" | apptainer registry login -u "$LOGIN_USER" --password-stdin "docker://$REGISTRY_HOSTNAME"
 else
-    log "No credentials provided, skipping login for $REGISTRY"
+    log "Password and/or user not provided, skipping login for $REGISTRY"
 fi
 
 # Function to build Apptainer image
 build_apptainer() {
-    local organisation="${ORG:-$USER}"
+    local organisation="${ORG:-$LOGIN_USER}"
     organisation="${organisation,,}"
     if [ "$REGISTRY" == "ghcr" ]; then
         local repo="${REPO,,}"
