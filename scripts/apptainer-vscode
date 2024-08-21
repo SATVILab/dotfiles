@@ -44,6 +44,7 @@ SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
 
 # Generate a unique identifier based on image metadata
 unique_id=$(apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "uname -r") # or use another command if needed
+unique_id="${unique_id// /_}"  # Replace spaces with underscores
 
 # Determine the CLI base directory
 if [ -n "$APPTAINER_CACHE_DIR" ]; then
@@ -85,7 +86,7 @@ log "  Log File: $log_file"
 # Install VSCode if it doesn't exist
 if [ ! -f "$CLI_BASE_DIR/bin/code" ]; then
     log "VSCode CLI not found, installing..."
-    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash apptainer-install-vscode -b "$CLI_BASE_DIR"
+    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "apptainer-install-vscode -b \"$CLI_BASE_DIR\""
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
