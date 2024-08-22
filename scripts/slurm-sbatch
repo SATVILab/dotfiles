@@ -63,14 +63,13 @@ if [[ -d "$WD/.git" ]] && [[ ! "$LOG_DIR_SHORT" = /* ]]; then
     fi
 fi
 
-
 # Generate the log file name based on the current date and time
 LOG_FILE_TIME=$(date '+%Y%m%d_%H%M%S')
-LOG_FILE_BASENAME=run_$(basename "$SLURM_SCRIPT")_$LOG_FILE_TIME_script.txt"
+LOG_FILE_BASENAME="run_$(basename "$SLURM_SCRIPT")_${LOG_FILE_TIME}_script.txt"
 LOG_FILE_SHORT="$LOG_DIR_SHORT/$LOG_FILE_BASENAME"
 LOG_FILE="$LOG_DIR/$LOG_FILE_BASENAME"
 
-LOG_FILE_SCRIPT_BASENAME=run_$(basename "$SLURM_SCRIPT")_$LOG_FILE_TIME_out.txt"
+LOG_FILE_SCRIPT_BASENAME="run_$(basename "$SLURM_SCRIPT")_${LOG_FILE_TIME}_out.txt"
 LOG_FILE_SCRIPT_SHORT="$LOG_DIR_SHORT/$LOG_FILE_SCRIPT_BASENAME"
 LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
 
@@ -92,5 +91,8 @@ LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
 } >> "$LOG_FILE"
 
 # Output a message indicating where the log file is located
-echo "Slurm job submitted. Logs will be saved to: $LOG_FILE_SHORT"
-echo "To view the log file, run: cat $LOG_FILE_SHORT"
+echo "$sbatch_output"
+echo "To view a record of the slurm script submitted, run:"
+echo "cat $LOG_FILE_SCRIPT_SHORT"
+echo "To view the log file, run:"
+echo "cat $LOG_FILE_SHORT"
