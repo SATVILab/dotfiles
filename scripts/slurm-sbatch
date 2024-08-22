@@ -27,6 +27,7 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
+LOG_DIR_SHORT="$LOG_DIR"
 if [[ ! "$LOG_DIR" = /* ]]; then
     LOG_DIR="$WD/$LOG_DIR"
 fi
@@ -48,17 +49,17 @@ sbatch_options=("$@")
 mkdir -p "$LOG_DIR"
 
 # Create .gitignore if it doesn't exist and add the log directory to it
-if [ -d "$WD/.git" ]; then
+if [[ -d "$WD/.git" ]] && [[ ! "$LOG_DIR_SHORT" = /* ]]; then
     PATH_GITIGNORE="$WD/.gitignore"
     if [ ! -f "$PATH_GITIGNORE" ]; then
         touch "$PATH_GITIGNORE"
     fi
     # Check if the log directory is already in .gitignore, and if not, add it
-    if grep -Fxq "$LOG_DIR" "$PATH_GITIGNORE"; then
-        echo "$LOG_DIR is already in .gitignore"
+    if grep -Fxq "$LOG_DIR_SHORT" "$PATH_GITIGNORE"; then
+        echo "$LOG_DIR_SHORT is already in .gitignore"
     else
-        echo "$LOG_DIR" >> "$PATH_GITIGNORE"
-        echo "$LOG_DIR has been added to .gitignore"
+        echo "$LOG_DIR_SHORT" >> "$PATH_GITIGNORE"
+        echo "$LOG_DIR_SHORT has been added to .gitignore"
     fi
 fi
 
