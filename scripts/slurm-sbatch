@@ -64,12 +64,13 @@ if [[ -d "$WD/.git" ]] && [[ ! "$LOG_DIR_SHORT" = /* ]]; then
 fi
 
 # Generate the log file name based on the current date and time
-LOG_FILE_TIME=$(date '+%Y%m%d_%H%M%S')
-LOG_FILE_BASENAME="run_$(basename "$SLURM_SCRIPT")_${LOG_FILE_TIME}_script.txt"
+LOG_FILE_TIME=$(date '+%Y-%m-%d_%H-%M-%S')
+SANITIZED_SCRIPT_NAME=$(basename "$SLURM_SCRIPT" .sh | tr -cd '[:alnum:]_-')
+LOG_FILE_BASENAME="run_$SANITIZED_SCRIPT_NAME_${LOG_FILE_TIME}_script.txt"
 LOG_FILE_SHORT="$LOG_DIR_SHORT/$LOG_FILE_BASENAME"
 LOG_FILE="$LOG_DIR/$LOG_FILE_BASENAME"
 
-LOG_FILE_SCRIPT_BASENAME="run_$(basename "$SLURM_SCRIPT")_${LOG_FILE_TIME}_out.txt"
+LOG_FILE_SCRIPT_BASENAME="run_$SANITIZED_SCRIPT_NAME_${LOG_FILE_TIME}_out.txt"
 LOG_FILE_SCRIPT_SHORT="$LOG_DIR_SHORT/$LOG_FILE_SCRIPT_BASENAME"
 LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
 
