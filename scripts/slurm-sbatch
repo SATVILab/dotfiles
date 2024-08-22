@@ -93,6 +93,6 @@ LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
 # Output a message indicating where the log file is located
 echo "$sbatch_output"
 echo "To view a record of the slurm script submitted, run:"
-echo "cat $LOG_FILE_SCRIPT_SHORT"
+echo "cat '$LOG_FILE_SCRIPT_SHORT'"
 echo "To view the log file, run:"
-echo "cat $LOG_FILE_SHORT"
+echo "cat '$LOG_FILE_SHORT'"
