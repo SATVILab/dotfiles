@@ -5,9 +5,22 @@ set -e
 # Function to display usage
 usage() {
     echo "Usage: $0 [-l <log_dir>] -s <slurm_script> [sbatch_options...]"
+    echo ""
     echo "  -l, --log-dir <log_dir> : Directory to save logs (default: _tmp/log/sbatch)"
     echo "  -s, --script-path <slurm_script> : Path to the Slurm script"
     echo "  [sbatch_options...]     : Additional options to pass to sbatch"
+    echo ""
+    echo "Description:"
+    echo "  This script submits a Slurm job and logs the details of the submission, including"
+    echo "  the script contents and standard output, to files in a specified log directory."
+    echo ""
+    echo "  The script name is sanitized by removing any non-alphanumeric characters except"
+    echo "  dashes (-) and underscores (_). The sanitized name is used in the log filenames."
+    echo "  The log filenames also include the current date and time to ensure uniqueness."
+    echo ""
+    echo "Example:"
+    echo "  $0 -l custom_logs -s my_job_script.sh -- --mem=4G --time=2:00:00"
+    echo ""
     exit 1
 }
 
@@ -55,9 +68,7 @@ if [[ -d "$WD/.git" ]] && [[ ! "$LOG_DIR_SHORT" = /* ]]; then
         touch "$PATH_GITIGNORE"
     fi
     # Check if the log directory is already in .gitignore, and if not, add it
-    if grep -Fxq "$LOG_DIR_SHORT" "$PATH_GITIGNORE"; then
-        echo "$LOG_DIR_SHORT is already in .gitignore"
-    else
+    if ! grep -Fxq "$LOG_DIR_SHORT" "$PATH_GITIGNORE"; then
         echo "$LOG_DIR_SHORT" >> "$PATH_GITIGNORE"
         echo "$LOG_DIR_SHORT has been added to .gitignore"
     fi
