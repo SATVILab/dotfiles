@@ -65,7 +65,14 @@ fi
 
 
 # Generate the log file name based on the current date and time
-LOG_FILE="$LOG_DIR/run_log_$(basename "$SLURM_SCRIPT")_$(date '+%Y%m%d_%H%M%S').txt"
+LOG_FILE_TIME=$(date '+%Y%m%d_%H%M%S')
+LOG_FILE_BASENAME=run_$(basename "$SLURM_SCRIPT")_$LOG_FILE_TIME_script.txt"
+LOG_FILE_SHORT="$LOG_DIR_SHORT/$LOG_FILE_BASENAME"
+LOG_FILE="$LOG_DIR/$LOG_FILE_BASENAME"
+
+LOG_FILE_SCRIPT_BASENAME=run_$(basename "$SLURM_SCRIPT")_$LOG_FILE_TIME_out.txt"
+LOG_FILE_SCRIPT_SHORT="$LOG_DIR_SHORT/$LOG_FILE_SCRIPT_BASENAME"
+LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
 
 # Copy the contents of the sbatch script over to the log file
 {
@@ -78,12 +85,12 @@ LOG_FILE="$LOG_DIR/run_log_$(basename "$SLURM_SCRIPT")_$(date '+%Y%m%d_%H%M%S').
 # Run sbatch with the provided script and options, capturing the job ID and standard output
 {
     echo "--- Standard Output ---"
-    sbatch_output=$(sbatch "${sbatch_options[@]}" "$SLURM_SCRIPT")
+    sbatch_output=$(sbatch "${sbatch_options[@]}" -o "$LOG_FILE_SCRIPT" "$SLURM_SCRIPT")
     echo "$sbatch_output"
     echo "-----------------------"
     echo ""
 } >> "$LOG_FILE"
 
 # Output a message indicating where the log file is located
-echo "Slurm job submitted. Logs will be saved to: $LOG_FILE"
-echo "To view the log file, run: cat $LOG_FILE"
+echo "Slurm job submitted. Logs will be saved to: $LOG_FILE_SHORT"
+echo "To view the log file, run: cat $LOG_FILE_SHORT"
