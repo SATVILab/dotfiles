@@ -4,55 +4,85 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-l <log_dir>] <slurm_script> [sbatch_options...]"
+    echo "Usage: $0 [-l <log_dir>] -s <slurm_script> [sbatch_options...]"
     echo "  -l, --log-dir <log_dir> : Directory to save logs (default: _tmp/log/sbatch)"
-    echo "  <slurm_script>          : Path to the Slurm script"
+    echo "  -s, --script-path <slurm_script> : Path to the Slurm script"
     echo "  [sbatch_options...]     : Additional options to pass to sbatch"
     exit 1
 }
 
 # Default log directory
-log_dir="_tmp/log/sbatch"
+WD=$(pwd)
+LOG_DIR=_tmp/log/sbatch
 
 # Parse options
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -l|--log-dir) log_dir="$2"; shift 2 ;;
+        -l|--log-dir) LOG_DIR="$2"; shift 2 ;;
+        -s|--script-path) SLURM_SCRIPT="$2"; shift 2 ;;
         -h|--help) usage ;;
         --) shift; break ;;
         -*|--*) echo "Unknown option: $1"; usage ;;
-        *) slurm_script="$1"; shift; break ;;
+        *)  break ;;
     esac
 done
 
+if [[ ! "$LOG_DIR" = /* ]]; then
+    LOG_DIR="$WD/$LOG_DIR"
+fi
+
 # Ensure a Slurm script is provided
-if [ -z "$slurm_script" ]; then
+if [ -z "$SLURM_SCRIPT" ]; then
     echo "Error: Slurm script path is required."
     usage
+fi
+
+if [[ ! "$SLURM_SCRIPT" = /* ]]; then
+    SLURM_SCRIPT="$WD/$SLURM_SCRIPT"
 fi
 
 # Handle any remaining sbatch options
 sbatch_options=("$@")
 
 # Create the log directory if it doesn't exist
-mkdir -p "$log_dir"
+mkdir -p "$LOG_DIR"
 
 # Create .gitignore if it doesn't exist and add the log directory to it
-if [ ! -f ".gitignore" ]; then
-    touch ".gitignore"
+if [ -d "$WD/.git" ]; then
+    PATH_GITIGNORE="$WD/.gitignore"
+    if [ ! -f "$PATH_GITIGNORE" ]; then
+        touch "$PATH_GITIGNORE"
+    fi
+    # Check if the log directory is already in .gitignore, and if not, add it
+    if grep -Fxq "$LOG_DIR" "$PATH_GITIGNORE"; then
+        echo "$LOG_DIR is already in .gitignore"
+    else
+        echo "$LOG_DIR" >> "$PATH_GITIGNORE"
+        echo "$LOG_DIR has been added to .gitignore"
+    fi
 fi
 
-# Check if the log directory is already in .gitignore, and if not, add it
-if ! grep -q "^${log_dir}" .gitignore; then
-    echo "$log_dir" >> .gitignore
-fi
 
 # Generate the log file name based on the current date and time
-log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+LOG_FILE="$LOG_DIR/run_log_$(basename "$SLURM_SCRIPT")_$(date '+%Y%m%d_%H%M%S').txt"
 
-# Run sbatch with the provided script and options, redirecting output to the log file
-sbatch "${sbatch_options[@]}" -o "$log_file" "$slurm_script"
+# Copy the contents of the sbatch script over to the log file
+{
+    echo "--- SLURM SCRIPT ---"
+    cat "$SLURM_SCRIPT"
+    echo "--------------------"
+    echo ""
+} >> "$LOG_FILE"
+
+# Run sbatch with the provided script and options, capturing the job ID and standard output
+{
+    echo "--- Standard Output ---"
+    sbatch_output=$(sbatch "${sbatch_options[@]}" "$SLURM_SCRIPT")
+    echo "$sbatch_output"
+    echo "-----------------------"
+    echo ""
+} >> "$LOG_FILE"
 
 # Output a message indicating where the log file is located
-echo "Slurm job submitted. Logs will be saved to: $log_file"
-echo "To view the log file, run: cat $log_file"
+echo "Slurm job submitted. Logs will be saved to: $LOG_FILE"
+echo "To view the log file, run: cat $LOG_FILE"
