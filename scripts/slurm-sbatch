@@ -91,16 +91,17 @@ LOG_FILE_SCRIPT="$LOG_DIR/$LOG_FILE_SCRIPT_BASENAME"
     cat "$SLURM_SCRIPT"
     echo "--------------------"
     echo ""
-} >> "$LOG_FILE"
+} >> "$LOG_FILE_SCRIPT"
 
-# Run sbatch with the provided script and options, capturing the job ID and standard output
+# Run sbatch with the provided script and options, capturing the job ID and standard output (from sbatch)
 {
     echo "--- Standard Output ---"
-    sbatch_output=$(sbatch "${sbatch_options[@]}" -o "$LOG_FILE_SCRIPT" "$SLURM_SCRIPT")
+    # Send standard output from run itself (not sbatch) to "$LOG_FILE"
+    sbatch_output=$(sbatch "${sbatch_options[@]}" -o "$LOG_FILE" "$SLURM_SCRIPT")
     echo "$sbatch_output"
     echo "-----------------------"
     echo ""
-} >> "$LOG_FILE"
+} >> "$LOG_FILE_SCRIPT"
 
 # Output a message indicating where the log file is located
 echo "$sbatch_output"
