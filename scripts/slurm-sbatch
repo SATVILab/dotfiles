@@ -78,8 +78,10 @@ if [ "NO_SUB_DIR" == "false" ]; then
     LOG_DIR_SHORT="$LOG_DIR_SHORT/$SANITIZED_SCRIPT_NAME"
 fi
 # Convert relative paths to absolute paths if necessary
-if [[ ! "$LOG_DIR" = /* ]]; then
+if [[ ! "$LOG_DIR_SHORT" = /* ]]; then
     LOG_DIR="$WD/$LOG_DIR"
+else
+    LOG_DIR="$LOG_DIR_SHORT"
 fi
 
 if [[ ! "$SLURM_SCRIPT" = /* ]]; then
