@@ -21,6 +21,11 @@ usage() {
     exit 1
 }
 
+# Acknowledgement:
+# Portions of this script are based on the work by the devcontainers-contrib organization.
+# See: https://github.com/devcontainers-contrib/features/blob/main/src/vscode-cli/install.sh
+# Licensed under the MIT License.
+
 # Default values
 install_dir="$HOME/.vscode-linux-x64"
 bin_dir="$HOME/.local/bin"
