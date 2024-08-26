@@ -4,11 +4,12 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-base-dir <path>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-base-dir <path>] [-V|--vscode-version <version>] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
     echo "  --cli-base-dir <path>       : Base directory for VSCode CLI installation (optional; defaults to \$APPTAINER_CACHE_DIR/vscode/<unique_id>)"
+    echo "  -V, --vscode-version <version>  : Specify the VS Code version to install (default: latest)"
     echo ""
     echo "Example: $0 -s mycontainer --clean"
     echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
@@ -20,6 +21,7 @@ SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CLEAN=false
 CLI_BASE_DIR=""
+VSCODE_VERSION="latest"  # Default to latest version if not specified
 CUSTOM_COMMAND=""
 
 # Parse named parameters and command
@@ -29,6 +31,7 @@ while [[ "$#" -gt 0 ]]; do
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -c|--clean) CLEAN=true; shift ;;
         --cli-base-dir) CLI_BASE_DIR="$2"; shift 2 ;;
+        -V|--vscode-version) VSCODE_VERSION="$2"; shift 2 ;;  # Parse VSCode version
         -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND="$@"; break ;;
         -*|--*) usage ;;
@@ -84,7 +87,7 @@ CLI_INSTALL_DIR="$CLI_BASE_DIR/install"
 CLI_DATA_DIR="$CLI_BASE_DIR/data"
 CLI_LOG_DIR="$CLI_BASE_DIR/logs"
 
-# get path to binary
+# Get path to binary
 PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/bin/code"
 
 # Create directories if they don't exist
@@ -110,6 +113,7 @@ log "  CLI Install Directory: $CLI_INSTALL_DIR"
 log "  CLI Data Directory: $CLI_DATA_DIR"
 log "  Path to CLI: $PATH_CLI"
 log "  Unique ID: $unique_id"
+log "  VS Code Version: $VSCODE_VERSION"
 log "  Log File: $log_file"
 
 # Install VSCode if it doesn't exist
@@ -130,7 +134,7 @@ if [ ! -f "$PATH_CLI" ]; then
 
     # Create the install directory
     mkdir -p "$CLI_INSTALL_DIR"
-    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -d "$CLI_INSTALL_DIR" -n
+    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -d "$CLI_INSTALL_DIR" -V "$VSCODE_VERSION" -n
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
