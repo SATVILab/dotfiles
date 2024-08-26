@@ -74,6 +74,11 @@ if [[ -z "$SLURM_SCRIPT" ]]; then
     usage
 fi
 
+if [[ ! -f "$SLURM_SCRIPT" ]]; then
+    echo "Error: Slurm script $SLURM_SCRIPT does not exist."
+    exit 1
+fi
+
 if [ "NO_SUB_DIR" == "false" ]; then
     SANITIZED_SCRIPT_NAME=$(basename "$SLURM_SCRIPT" .sh | tr -cd '[:alnum:]_-')
     if [ -z "$SANITIZED_SCRIPT_NAME" ]; then
