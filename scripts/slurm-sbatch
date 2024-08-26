@@ -28,7 +28,7 @@ usage() {
 
 # Default log directory
 WD=$(pwd)
-LOG_DIR_SHORT=_tmp/log/sbatch
+LOG_DIR_SHORT="_tmp/log/sbatch"
 SLURM_SCRIPT=""
 NO_SUB_DIR=false
 DEBUG=false
@@ -74,7 +74,12 @@ if [[ -z "$SLURM_SCRIPT" ]]; then
     usage
 fi
 
-if [ "NO_SUB_DIR" == "false" ]; then
+if [[ ! -f "$SLURM_SCRIPT" ]]; then
+    echo "Error: Slurm script $SLURM_SCRIPT does not exist."
+    exit 1
+fi
+
+if [ "$NO_SUB_DIR" == "false" ]; then
     SANITIZED_SCRIPT_NAME=$(basename "$SLURM_SCRIPT" .sh | tr -cd '[:alnum:]_-')
     if [ -z "$SANITIZED_SCRIPT_NAME" ]; then
         echo "Error: Invalid script name."
@@ -83,9 +88,10 @@ if [ "NO_SUB_DIR" == "false" ]; then
     fi
     LOG_DIR_SHORT="$LOG_DIR_SHORT/$SANITIZED_SCRIPT_NAME"
 fi
+
 # Convert relative paths to absolute paths if necessary
 if [[ ! "$LOG_DIR_SHORT" = /* ]]; then
-    LOG_DIR="$WD/$LOG_DIR"
+    LOG_DIR="$WD/$LOG_DIR_SHORT"
 else
     LOG_DIR="$LOG_DIR_SHORT"
 fi
@@ -94,14 +100,18 @@ if [[ ! "$SLURM_SCRIPT" = /* ]]; then
     SLURM_SCRIPT="$WD/$SLURM_SCRIPT"
 fi
 
-# Ensure the Slurm script exists
-if [[ ! -f "$SLURM_SCRIPT" ]]; then
-    echo "Error: Slurm script $SLURM_SCRIPT does not exist."
-    exit 1
-fi
-
 # Handle any remaining sbatch options
 sbatch_options=("$@")
+
+# If debug is enabled, print debug information before proceeding
+if [ "$DEBUG" == "true" ]; then
+    echo "DEBUG: slurm-sbatch parameters: "
+    echo "LOG_DIR_SHORT: $LOG_DIR_SHORT"
+    echo "SLURM_SCRIPT: $SLURM_SCRIPT"
+    echo "NO_SUB_DIR: $NO_SUB_DIR"
+    echo "LOG_DIR: $LOG_DIR"
+    echo "sbatch_options: ${sbatch_options[*]}"
+fi
 
 # Create the log directory if it doesn't exist
 mkdir -p "$LOG_DIR"
@@ -160,26 +170,10 @@ fi
     echo ""
 } >> "$LOG_FILE_SCRIPT"
 
-if [ "$DEBUG" == "true" ]; then
-    echo "slurm-sbatch parameters: "
-    echo "LOG_DIR_SHORT: $LOG_DIR_SHORT"
-    echo "SLURM_SCRIPT: $SLURM_SCRIPT"
-    echo "NO_SUB_DIR: $NO_SUB_DIR"
-    echo "LOG_DIR: $LOG_DIR"
-    echo "LOG_FILE_TIME: $LOG_FILE_TIME"
-    echo "LOG_FILE_BASENAME: $LOG_FILE_BASENAME"
-    echo "LOG_FILE_SHORT: $LOG_FILE_SHORT"
-    echo "LOG_FILE: $LOG_FILE"
-    echo "LOG_FILE_SCRIPT_BASENAME: $LOG_FILE_SCRIPT_BASENAME"
-    echo "LOG_FILE_SCRIPT_SHORT: $LOG_FILE_SCRIPT_SHORT"
-    echo "LOG_FILE_SCRIPT: $LOG_FILE_SCRIPT"
-    echo "sbatch_command: $sbatch_command"
-    echo "sbatch_output: $sbatch_output"
-fi
-
 # Output a message indicating where the log file is located
 echo "$sbatch_output"
 echo "To view a record of the slurm script submitted, run:"
 echo "cat '$LOG_FILE_SCRIPT_SHORT'"
 echo "To view the output from the run, run:"
 echo "cat '$LOG_FILE_SHORT'"
+
