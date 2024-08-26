@@ -7,6 +7,7 @@ usage() {
     echo "Usage: $0 [-l <log_dir>] <slurm_script> [-- sbatch_options...]"
     echo ""
     echo "  -l, --log-dir <log_dir> : Directory to save logs (default: _tmp/log/sbatch)"
+    echo "  -n, --no-sub-dir        : Do not use the script name to create a sub-directory in the log directory"
     echo "  <slurm_script>          : Path to the Slurm script"
     echo "  [-- sbatch_options...]  : Additional options to pass to sbatch"
     echo ""
@@ -26,15 +27,20 @@ usage() {
 
 # Default log directory
 WD=$(pwd)
-LOG_DIR=_tmp/log/sbatch
+LOG_DIR_SHORT=_tmp/log/sbatch
 SLURM_SCRIPT=""
+NO_SUB_DIR=false
 
 # Parse options and script path
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -l|--log-dir)
-            LOG_DIR="$2"
+            LOG_DIR_SHORT="$2"
             shift 2
+            ;;
+        -n|--no-sub-dir) 
+            NO_SUB_DIR=true
+            shift
             ;;
         --)
             shift
@@ -62,14 +68,16 @@ if [[ -z "$SLURM_SCRIPT" ]]; then
     usage
 fi
 
-# Convert relative paths to absolute paths if necessary
-SANITIZED_SCRIPT_NAME=$(basename "$SLURM_SCRIPT" .sh | tr -cd '[:alnum:]_-')
-if [ -z "$SANITIZED_SCRIPT_NAME" ]; then
-    echo "Error: Invalid script name."
-    echo "Sanitized script name was empty."
-    exit 1
+if [ "NO_SUB_DIR" == "false" ]; then
+    SANITIZED_SCRIPT_NAME=$(basename "$SLURM_SCRIPT" .sh | tr -cd '[:alnum:]_-')
+    if [ -z "$SANITIZED_SCRIPT_NAME" ]; then
+        echo "Error: Invalid script name."
+        echo "Sanitized script name was empty."
+        exit 1
+    fi
+    LOG_DIR_SHORT="$LOG_DIR_SHORT/$SANITIZED_SCRIPT_NAME"
 fi
-LOG_DIR_SHORT="$LOG_DIR/$SANITIZED_SCRIPT_NAME"
+# Convert relative paths to absolute paths if necessary
 if [[ ! "$LOG_DIR" = /* ]]; then
     LOG_DIR="$WD/$LOG_DIR"
 fi
