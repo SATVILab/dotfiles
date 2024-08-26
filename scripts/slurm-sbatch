@@ -8,6 +8,7 @@ usage() {
     echo ""
     echo "  -l, --log-dir <log_dir> : Directory to save logs (default: _tmp/log/sbatch)"
     echo "  -n, --no-sub-dir        : Do not use the script name to create a sub-directory in the log directory"
+    echo "  -d, --debug             : Print debug information (for the slurm-sbatch script itself)"
     echo "  <slurm_script>          : Path to the Slurm script"
     echo "  [-- sbatch_options...]  : Additional options to pass to sbatch"
     echo ""
@@ -30,6 +31,7 @@ WD=$(pwd)
 LOG_DIR_SHORT=_tmp/log/sbatch
 SLURM_SCRIPT=""
 NO_SUB_DIR=false
+DEBUG=false
 
 # Parse options and script path
 while [[ "$#" -gt 0 ]]; do
@@ -40,6 +42,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -n|--no-sub-dir) 
             NO_SUB_DIR=true
+            shift
+            ;;
+        -d|--debug)
+            DEBUG=true
             shift
             ;;
         --)
@@ -153,6 +159,23 @@ fi
     echo "-----------------------"
     echo ""
 } >> "$LOG_FILE_SCRIPT"
+
+if [ "$DEBUG" == "true" ]; then
+    echo "slurm-sbatch parameters: "
+    echo "LOG_DIR_SHORT: $LOG_DIR_SHORT"
+    echo "SLURM_SCRIPT: $SLURM_SCRIPT"
+    echo "NO_SUB_DIR: $NO_SUB_DIR"
+    echo "LOG_DIR: $LOG_DIR"
+    echo "LOG_FILE_TIME: $LOG_FILE_TIME"
+    echo "LOG_FILE_BASENAME: $LOG_FILE_BASENAME"
+    echo "LOG_FILE_SHORT: $LOG_FILE_SHORT"
+    echo "LOG_FILE: $LOG_FILE"
+    echo "LOG_FILE_SCRIPT_BASENAME: $LOG_FILE_SCRIPT_BASENAME"
+    echo "LOG_FILE_SCRIPT_SHORT: $LOG_FILE_SCRIPT_SHORT"
+    echo "LOG_FILE_SCRIPT: $LOG_FILE_SCRIPT"
+    echo "sbatch_command: $sbatch_command"
+    echo "sbatch_output: $sbatch_output"
+fi
 
 # Output a message indicating where the log file is located
 echo "$sbatch_output"
