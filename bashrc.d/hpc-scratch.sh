@@ -6,6 +6,11 @@ if [ ! -d "/scratch/$USER" ]; then
     exit 0
 fi
 
+if [[ ! "$HOSTNAME" =~ ^srvrochpc[0-9]+ ]]; then
+    echo "Not setting scratch variables since not on UCT HPC"
+    exit 0
+fi
+
 # use XDG relative directories, but
 # relative to /scratch/$USER
 export XDG_DATA_HOME=/scratch/"$USER"/.local/share
