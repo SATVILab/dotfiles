@@ -25,7 +25,6 @@ SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CUSTOM_COMMAND=()
 NO_BASHRC=false
-CPUS_FLAG=""
 
 # Parse named parameters and command
 while [[ "$#" -gt 0 ]]; do
@@ -91,11 +90,6 @@ else
     exit 1
 fi
 
-# Check if SLURM_NTASKS is available and set the --cpus flag
-if [ -n "$SLURM_NTASKS" ]; then
-    CPUS_FLAG="--cpus $SLURM_NTASKS"
-fi
-
 # Log the parsed options
 log "Options:"
 log "  SIF File: $SIF_FILE"
@@ -105,7 +99,6 @@ log "  Home Directory: $HOME_DIR"
 log "  SIF Path: $SIF_PATH"
 log "  Custom Command: $CUSTOM_COMMAND_STRING"
 log "  Log File: $log_file"
-log "  CPUs Flag: $CPUS_FLAG"
 
 # Function to handle errors and log the location of the log file
 error_handler() {
@@ -126,10 +119,10 @@ fi
 
 if [ -n "$CUSTOM_COMMAND_STRING" ]; then
     log "Running Apptainer image with custom command: $CUSTOM_COMMAND_STRING from '$SIF_PATH'"
-    apptainer exec $CPUS_FLAG "$SIF_PATH" bash -c "$BASHRC_SOURCE $CUSTOM_COMMAND_STRING"
+    apptainer exec "$SIF_PATH" bash -c "$BASHRC_SOURCE $CUSTOM_COMMAND_STRING"
 else
     log "Running Apptainer image in shell mode from '$SIF_PATH'"
-    apptainer exec $CPUS_FLAG "$SIF_PATH" bash -c "$BASHRC_SOURCE exec bash"
+    apptainer exec "$SIF_PATH" bash -c "$BASHRC_SOURCE exec bash"
 fi
 
 log "Apptainer run process completed successfully"
