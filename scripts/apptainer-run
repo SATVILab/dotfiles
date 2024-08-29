@@ -7,7 +7,6 @@ usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>] [-n] [<command> ...]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
-    echo "  -n, --no-login-command      : Do not source the user's .bashrc file and /etc/profile (in the container) before running the command"
     echo "  <command>                   : Custom command to run inside the container (optional, defaults to opening a shell)"
     echo ""
     echo "Description:"
@@ -24,14 +23,12 @@ usage() {
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CUSTOM_COMMAND=()
-LOGIN_MIMIC=true
 
 # Parse named parameters and command
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
-        -n|--no-bashrc) LOGIN_MIMIC=false; shift ;;
         -h|--help) usage ;;
         --) shift; CUSTOM_COMMAND+=("$@"); break ;;
         -*|--*) usage ;;
@@ -111,19 +108,12 @@ error_handler() {
 # Trap errors to run the error handler
 trap 'error_handler' ERR
 
-# Determine if .bashrc should be sourced
-LOGIN_COMMAND=""
-if [[ "$LOGIN_MIMIC" = "false" ]]; then
-    LOGIN_COMMAND+='if [ -f /etc/profile ]; then source /etc/profile; fi; '
-    LOGIN_COMMAND+='if [ -f "$HOME"/.bashrc ]; then source "$HOME"/.bashrc; fi; '
-fi
-
 if [ -n "$CUSTOM_COMMAND_STRING" ]; then
     log "Running Apptainer image with custom command: $CUSTOM_COMMAND_STRING from '$SIF_PATH'"
-    apptainer exec "$SIF_PATH" bash -c "$LOGIN_COMMAND $CUSTOM_COMMAND_STRING"
+    apptainer exec "$SIF_PATH" bash -c "$CUSTOM_COMMAND_STRING"
 else
     log "Running Apptainer image in shell mode from '$SIF_PATH'"
-    apptainer exec "$SIF_PATH" bash -c "$LOGIN_COMMAND exec bash"
+    apptainer shell "$SIF_PATH"
 fi
 
 log "Apptainer run process completed successfully"
