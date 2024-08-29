@@ -80,16 +80,19 @@ To use this dotfiles repository in GitHub Codespaces:
 - **`apptainer-pull`**: Pulls an Apptainer image from the GitHub Container Registry and saves it locally.
 - **`apptainer-run`**: Runs a command inside an Apptainer container.
 - **`apptainer-run-rscript`**: Runs an R script inside an Apptainer container.
+- **`apptainer-vscode`**: Installs and manages VS Code CLI for each Apptainer image.
 
 ### Slurm Scripts
 
-- **`slurm-sintx`**: Submits a job to Slurm with a specified number of tasks (default is 2).
+- **`slurm-sbatch`**: Submits a job to Slurm, saving logs in a structured directory.
+- **`slurm-sintx`**: Submits a Slurm job with a specified number of tasks (default is 2).
 - **`slurm-squeue`**: Displays the Slurm queue for the current user.
 
 ### Utility Scripts
 
 - **`hpc-dotfiles-update`**: Updates the dotfiles repository on the HPC and re-runs the setup.
 - **`install-jetbrains-font`**: Installs the JetBrains Mono font and configures it for use in VS Code.
+- **`install-vscode`**: Downloads and installs VS Code CLI, creating symbolic links for easy access.
 
 ## Dotfiles Overview
 
@@ -114,4 +117,3 @@ To use this dotfiles repository in GitHub Codespaces:
 - [Dotfiles Guide](https://dotfiles.github.io/)
 - [Apptainer Documentation](https://apptainer.org/docs/)
 - [Slurm User Guide](https://slurm.schedmd.com/documentation.html)
-

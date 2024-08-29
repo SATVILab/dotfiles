@@ -105,12 +105,16 @@ sbatch_options=("$@")
 
 # If debug is enabled, print debug information before proceeding
 if [ "$DEBUG" == "true" ]; then
+    echo ""
+    echo "-----------------------------"
     echo "DEBUG: slurm-sbatch parameters: "
     echo "LOG_DIR_SHORT: $LOG_DIR_SHORT"
     echo "SLURM_SCRIPT: $SLURM_SCRIPT"
     echo "NO_SUB_DIR: $NO_SUB_DIR"
     echo "LOG_DIR: $LOG_DIR"
     echo "sbatch_options: ${sbatch_options[*]}"
+    echo "-----------------------------"
+    echo ""
 fi
 
 # Create the log directory if it doesn't exist
