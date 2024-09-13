@@ -56,7 +56,7 @@ done
 
 # Check mandatory parameters
 if [ -z "$LOGIN_USER" ] && [ -z "$ORG" ]; then
-    echo "Error: Either user or organisation is required."
+    echo "Error: Either --user or --org must be specified."
     usage
     exit 1
 fi
