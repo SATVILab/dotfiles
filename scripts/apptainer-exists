@@ -6,7 +6,7 @@ set -e
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>]"
     echo "  -s, --sif <sif>             : Name of the SIF file to check (defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (checked before default directories)"
     echo ""
     echo "Description:"
     echo "  This script checks if a specified Apptainer Image File (SIF) exists in the given directory or"
