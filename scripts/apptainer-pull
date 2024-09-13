@@ -141,10 +141,8 @@ else
 fi
 
 # Set the password (GH_TOKEN) if not provided and GHCR is used
-if [ "$REGISTRY" = "ghcr" ]; then
-    PASSWORD=${PASSWORD:-$GH_TOKEN}
-    PASSWORD=${PASSWORD:-$GITHUB_TOKEN}
-    PASSWORD=${PASSWORD:-$GITHUB_PAT}
+if [ "$REGISTRY" = "ghcr" ] && [ -z "$PASSWORD" ]; then
+    PASSWORD="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT}}}"
 fi
 
 # Log in to the registry if credentials are provided
@@ -159,17 +157,20 @@ fi
 build_apptainer() {
     local organisation="${ORG:-$LOGIN_USER}"
     organisation="${organisation,,}"
-    if [ "$REGISTRY" == "ghcr" ]; then
-        local repo="${REPO,,}"
-    else
-        local repo="$REPO"
-    fi
+    local repo="${REPO,,}"
     local image_uri="docker://${REGISTRY_HOSTNAME}/${organisation}/${repo}:${TAG}"
-    
+
     log "Building Apptainer image '$SIF_FILE' from Docker image '$image_uri'"
-    apptainer build --force "$SIF_FILE" "$image_uri"
+
+    if [ "$FORCE" = true ]; then
+        apptainer build --force "$SIF_FILE" "$image_uri"
+    else
+        apptainer build "$SIF_FILE" "$image_uri"
+    fi
+
     log "Apptainer build process completed"
 }
+
 
 # Run the build function
 build_apptainer
