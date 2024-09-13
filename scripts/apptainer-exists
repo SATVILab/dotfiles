@@ -6,7 +6,7 @@ set -e
 usage() {
     echo "Usage: $0 [-s <sif>] [-d <directory>]"
     echo "  -s, --sif <sif>             : Name of the SIF file to check (defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
+    echo "  -d, --directory <directory> : Directory to search for the SIF file (checked before default directories)"
     echo ""
     echo "Description:"
     echo "  This script checks if a specified Apptainer Image File (SIF) exists in the given directory or"
@@ -74,13 +74,21 @@ log "  Log File: $log_file"
 # Determine the full path of the SIF file and check for existence
 SIF_PATH=""
 
+# Determine the full path of the SIF file and check for existence
+SIF_PATH=""
+
 if [ -n "$DIRECTORY" ]; then
-    SIF_PATH="$DIRECTORY/$SIF_FILE"
-elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
+    if [ -f "$DIRECTORY/$SIF_FILE" ]; then
+        SIF_PATH="$DIRECTORY/$SIF_FILE"
+    fi
+fi
+
+if [ -z "$SIF_PATH" ] && [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
     SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
-elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
+elif [ -z "$SIF_PATH" ] && [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
     SIF_PATH="$HOME_DIR/$SIF_FILE"
 fi
+
 
 if [ -n "$SIF_PATH" ] && [ -f "$SIF_PATH" ]; then
     log "SIF file '$SIF_PATH' exists."
