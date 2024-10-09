@@ -134,7 +134,7 @@ if [ ! -f "$PATH_CLI" ]; then
 
     # Create the install directory
     mkdir -p "$CLI_INSTALL_DIR"
-    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -V "$VSCODE_VERSION" -n
+    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -V "$VSCODE_VERSION"
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
