@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 # Function to display usage
 usage() {
@@ -118,4 +118,4 @@ trap 'cleanup' EXIT
 
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
-apptainer exec "$SIF_PATH" "$PATH_CLI"
+apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel --accept-server-license-terms
