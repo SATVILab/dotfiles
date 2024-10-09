@@ -95,7 +95,7 @@ if [ ! -f "$PATH_CLI" ]; then
 else
     # Update VSCode CLI if needed
     log "Updating VSCode CLI..."
-    apptainer exec "$SIF_PATH" "$PATH_CLI" update
+    apptainer exec "$SIF_PATH" "$PATH_CLI" update || log "VSCode CLI is already up to date or update failed."
     log "Update complete"
 fi
 
@@ -110,7 +110,7 @@ fi
 
 cleanup() {
     log "Stopping currently running tunnels"
-    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill
+    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill || log "Attempted to kill running tunnels"
     log "Stopped currently running tunnels"
 }
 
