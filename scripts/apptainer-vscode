@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [--cli-base-dir <path>] [-V|--vscode-version <version>] [<command> ...]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [-V|--vscode-version <version>]"
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
-    echo "  --cli-base-dir <path>       : Base directory for VSCode CLI installation (optional; defaults to \$APPTAINER_CACHE_DIR/vscode/<unique_id>)"
     echo "  -V, --vscode-version <version>  : Specify the VS Code version to install (default: latest)"
     echo ""
     echo "Example: $0 -s mycontainer --clean"
-    echo "Note: If your command includes special characters, ensure it is wrapped in quotes."
     exit 1
 }
 
@@ -20,9 +18,7 @@ usage() {
 SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
 DIRECTORY=""
 CLEAN=false
-CLI_BASE_DIR=""
 VSCODE_VERSION="latest"  # Default to latest version if not specified
-CUSTOM_COMMAND=""
 
 # Parse named parameters and command
 while [[ "$#" -gt 0 ]]; do
@@ -30,14 +26,13 @@ while [[ "$#" -gt 0 ]]; do
         -s|--sif) SIF_FILE="$2"; shift 2 ;;
         -d|--directory) DIRECTORY="$2"; shift 2 ;;
         -c|--clean) CLEAN=true; shift ;;
-        --cli-base-dir) CLI_BASE_DIR="$2"; shift 2 ;;
         -V|--vscode-version) VSCODE_VERSION="$2"; shift 2 ;;  # Parse VSCode version
         -h|--help) usage ;;
-        --) shift; CUSTOM_COMMAND="$@"; break ;;
         -*|--*) usage ;;
-        *) CUSTOM_COMMAND="$@"; break ;;
     esac
 done
+
+PATH_CLI="$HOME/.local/bin/code"
 
 # Ensure the SIF_FILE ends with .sif and convert to lowercase
 SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
@@ -65,42 +60,19 @@ if [ ! -f "$SIF_PATH" ]; then
     exit 1
 fi
 
-# Generate a unique identifier based on image metadata
-unique_id=$(apptainer exec "$SIF_PATH" uname -r | tr -d '[:space:]')
-
-# Ensure unique_id is set correctly
-if [ -z "$unique_id" ]; then
-    echo "Error: Failed to retrieve unique identifier from the image."
-    exit 1
-fi
-
-# Determine the CLI base directory
-if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    CLI_BASE_DIR="${CLI_BASE_DIR:-$APPTAINER_CACHE_DIR/vscode/$unique_id}"
-elif [ -d "/scratch/$USER" ]; then
-    CLI_BASE_DIR="${CLI_BASE_DIR:-/scratch/$USER/.local/share/vscode/$unique_id}"
-else
-    CLI_BASE_DIR="${CLI_BASE_DIR:-$HOME/.local/share/vscode/$unique_id}"
-fi
-
-CLI_INSTALL_DIR="$CLI_BASE_DIR/install"
-CLI_DATA_DIR="$CLI_BASE_DIR/data"
-CLI_LOG_DIR="$CLI_BASE_DIR/logs"
-
-# Get path to binary
-PATH_CLI="$CLI_INSTALL_DIR/VSCode-linux-x64/bin/code"
-
-# Create directories if they don't exist
-mkdir -p "$CLI_INSTALL_DIR"
-mkdir -p "$CLI_DATA_DIR"
-mkdir -p "$CLI_LOG_DIR"
-
 # Create a log file
-log_file="$CLI_LOG_DIR/vscode_log_$(date '+%Y%m%d_%H%M%S').txt"
+mkdir -p /tmp/vscode
+log_dir="/tmp/log/vscode"
+if [ -d "$log_dir" ]; then
+  rm -rf "$log_dir"
+fi
+mkdir -p "$log_dir"
+log_file="$log_dir/log_$(date '+%Y%m%d_%H%M%S').txt"
+echo "See $log_file for logs"
 
 # Function to log messages
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$log_file"
 }
 
 # Log the parsed options
@@ -108,32 +80,17 @@ log "Options:"
 log "  SIF File: $SIF_FILE"
 log "  Directory: $DIRECTORY"
 log "  Clean: $CLEAN"
-log "  CLI Base Directory: $CLI_BASE_DIR"
-log "  CLI Install Directory: $CLI_INSTALL_DIR"
-log "  CLI Data Directory: $CLI_DATA_DIR"
 log "  Path to CLI: $PATH_CLI"
-log "  Unique ID: $unique_id"
 log "  VS Code Version: $VSCODE_VERSION"
 log "  Log File: $log_file"
 
 # Install VSCode if it doesn't exist
 if [ ! -f "$PATH_CLI" ]; then
     log "VSCode CLI not found, installing..."
-    # Check if the CLI install directory exists
-    if [ -d "$CLI_INSTALL_DIR" ]; then
-        # Check if 'code' command exists
-        if command -v code > /dev/null 2>&1; then
-            # Kill any running VSCode tunnels
-            code tunnel kill || true
-            sleep 1
-            code tunnel prune || true
-        fi
-        # Remove the existing installation directory
-        rm -rf "$CLI_INSTALL_DIR"
+    if [ ! -x "$HOME/.local/bin/install-vscode" ]; then
+        echo "Error: install-vscode script not found or not executable at $HOME/.local/bin/install-vscode"
+        exit 1
     fi
-
-    # Create the install directory
-    mkdir -p "$CLI_INSTALL_DIR"
     apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -V "$VSCODE_VERSION"
 else
     # Update VSCode CLI if needed
@@ -142,28 +99,23 @@ else
     log "Update complete"
 fi
 
-# Prepare the command for running inside the container
-COMMANDS=""
-
 # Clean up existing tunnels if requested
 if [ "$CLEAN" == "true" ]; then
-    COMMANDS+="($PATH_CLI tunnel kill || true); sleep 2; "
-    COMMANDS+="($PATH_CLI tunnel prune || true); sleep 2; "
-    COMMANDS+="($PATH_CLI tunnel unregister || true); sleep 2; "
+    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill || true
+    sleep 1
+    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel prune || true
+    sleep 1
+    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel unregister || true
 fi
 
-# Add the command to start VS Code tunnel
-COMMANDS+="\"$PATH_CLI\" tunnel --accept-server-license-terms --cli-data-dir \"$CLI_DATA_DIR\""
-log "COMMANDS: $COMMANDS"
-
 cleanup() {
-    echo "Stopping currently running tunnels"
-    apptainer-run -s "$SIF_FILE" -d "$DIRECTORY" -- bash -c "$PATH_CLI tunnel kill"
-    echo "Stopped currently running tunnels"
+    log "Stopping currently running tunnels"
+    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill
+    log "Stopped currently running tunnels"
 }
 
 trap 'cleanup' EXIT
 
 # Execute the prepared command inside the Apptainer container
 log "Starting VS Code tunnel inside Apptainer container..."
-apptainer exec "$SIF_PATH" bash -c "$COMMANDS"
+apptainer exec "$SIF_PATH" "$PATH_CLI"

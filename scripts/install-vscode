@@ -7,6 +7,7 @@ usage() {
     echo "Usage: $0 [-b <bin_dir>] [-V <vscode_version>]"
     echo "  -b, --bin-dir <bin_dir>        : Directory to place the 'code' executable (default: \$HOME/.local/bin)"
     echo "  -V, --vscode-version <version> : Version of VSCode to install (default: latest)"
+    echo "  -h, --help : Display help file"
     echo ""
     echo "Description:"
     echo "  This script downloads and installs the Visual Studio Code 'code' executable in the specified bin directory."
