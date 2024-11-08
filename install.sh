@@ -30,7 +30,7 @@ clone_repo() {
     echo "Cloning GitHub repository"
     # Clone the specified GitHub repository into a temporary directory
     TMP_DIR=$(mktemp -d)
-    git clone https://SATVILab/dotfiles.git "$TMP_DIR"
+    git clone https://github.com/SATVILab/dotfiles.git "$TMP_DIR"
     echo "Successfully cloned GitHub repository SATVILab/dotfiles"
     echo "Copying scripts to ~/.local/bin..."
     cp -r "$TMP_DIR/scripts/"* "$HOME/.local/bin/"
