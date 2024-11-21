@@ -59,7 +59,7 @@ use_scratch() {
     }
 }
 
-# Exit early if /scratch/$USER directory does not exist
+# Don't run if if /scratch/$USER directory does not exist
 if [[ -d "/scratch/$USER" && "$HOSTNAME" =~ ^srvrochpc[0-9]+ ]]; then
     use_scratch
 fi
