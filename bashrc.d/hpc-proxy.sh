@@ -1,17 +1,39 @@
 #!/usr/bin/env bash
 
-# Function to display usage information
-usage() {
-    echo "Usage: check_proxy_vars [OPTIONS]"
-    echo ""
-    echo "This script checks and sets proxy environment variables if not already set."
-    echo "It is designed to run on UCT HPC machines."
-    echo ""
-    echo "Options:"
-    echo "  -h, --help       Show this help message and exit"
-    echo "  -V, --verbose    Enable verbose mode to echo out messages during execution"
-    echo ""
-}
+###############################################################################
+# Script Name    : check_proxy_vars.sh
+# Description    : Checks and sets proxy environment variables if they are
+#                  not already set. This script is tailored for use on UCT
+#                  HPC machines to ensure proper proxy configuration.
+#
+# Usage          : 
+#   - To display help:
+#       ./check_proxy_vars.sh --help
+#   - To run the script with verbose output:
+#       ./check_proxy_vars.sh --verbose
+#
+# Options:
+#   -h, --help       Show this help message and exit
+#   -V, --verbose    Enable verbose mode to echo out messages during execution
+#
+# Requirements    :
+#   - Bash shell
+#   - Must be run on UCT HPC machines matching the hostname pattern ^srvrochpc[0-9]+
+#
+# Environment Variables Managed:
+#   - ftp_proxy
+#   - https_proxy
+#   - http_proxy
+#
+# Author         : Miguel Rodo
+# Contact        : miguel.rodo@uct.ac.za
+# License        : MIT License
+# Version        : 1.0
+# Last Modified  : 2024 Nov 17
+#
+# Notes          :
+#   - Modify the proxy URL in the script if your environment requires a different proxy.
+###############################################################################
 
 # Function to check and set proxy environment variables
 check_proxy_vars() {
@@ -66,7 +88,9 @@ check_proxy_vars() {
 }
 
 # Call the function to check and set proxy variables, passing all arguments
-check_proxy_vars "$@"
+if [[ "$HOSTNAME" =~ ^srvrochpc[0-9]+ ]]; then
+    check_proxy_vars "$@"
+fi
 
 # Unset the function to avoid polluting the global namespace
 unset -f check_proxy_vars
