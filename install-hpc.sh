@@ -2,35 +2,7 @@
 
 # install-hpc.sh
 # This script sets up the environment on an HPC by configuring environment variables,
-# copying scripts and bashrc.d files, optionally copying hidden files, and setting up Git.
-
-usage() {
-    echo "Usage: $0 [-c]"
-    echo "  -c                          : Copy hidden configuration files (.Renviron, .lintr, .radian_profile) to the home directory"
-    echo ""
-    echo "Example: $0 -c"
-    echo ""
-    echo "Guidelines:"
-    echo "  - Use the '-c' option if you want to copy hidden configuration files to your home directory."
-    echo "  - Hidden files include .Renviron, .lintr, and .radian_profile."
-    exit 0
-}
-
-# Parse the command-line options
-COPY_HIDDEN=false
-while getopts "ch" opt; do
-  case ${opt} in
-    c )
-      COPY_HIDDEN=true
-      ;;
-    h )
-      usage
-      ;;
-    \? )
-      usage
-      ;;
-  esac
-done
+# copying scripts and bashrc.d files, copying hidden files, and setting up Git.
 
 # Ensure .bashrc sources .bashrc.d
 if [ ! -e "$HOME/.bashrc" ]; then
@@ -71,15 +43,45 @@ for file in "$HOME/dotfiles/bashrc.d/"*; do
     fi
 done
 
-# Optionally copy hidden files to home directory if the -c flag is set
-if [ "$COPY_HIDDEN" = true ]; then
-    echo "Copying hidden configuration files to home directory..."
-    cp "$HOME/dotfiles/.Renviron" "$HOME/"
-    cp "$HOME/dotfiles/.lintr" "$HOME/"
-    cp "$HOME/dotfiles/.radian_profile" "$HOME/"
-    echo "Hidden configuration files copied to home directory."
-else
-    echo "Skipping copying of hidden configuration files. Use the '-c' flag to copy them."
+# Prepare to copy hidden configuration files
+hidden_files=(".Renviron" ".lintr" ".radian_profile")
+files_to_copy=()
+differences=""
+
+for file in "${hidden_files[@]}"; do
+    src="$HOME/dotfiles/$file"
+    dest="$HOME/$file"
+    if [ -e "$src" ]; then
+        if [ ! -e "$dest" ] || ! cmp -s "$src" "$dest"; then
+            # Collect differences
+            if [ -e "$dest" ]; then
+                differences+="Differences in $file:\n"
+                differences+="$(diff "$dest" "$src")\n\n"
+            else
+                differences+="File $file does not exist in your home directory.\n\n"
+            fi
+            files_to_copy+=("$file")
+        fi
+    else
+        echo "Source file $src does not exist. Skipping."
+    fi
+done
+
+# If there are files to copy, ask the user
+if [ ${#files_to_copy[@]} -gt 0 ]; then
+    echo -e "The following R configuration files differ from your current ones or do not exist in your home directory:\n"
+    echo -e "$differences"
+    echo "Do you want to copy these files to your home directory? If you're really not sure, you should just say 'yes'. [y/N]"
+    read -p "Enter y or n: " confirm
+    confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+    if [ "$confirm" = "y" ] || [ "$confirm" = "yes" ]; then
+        for file in "${files_to_copy[@]}"; do
+            cp "$HOME/dotfiles/$file" "$HOME/$file"
+            echo "$file copied to home directory."
+        done
+    else
+        echo "Skipped copying hidden configuration files."
+    fi
 fi
 
 # Check Git configuration
