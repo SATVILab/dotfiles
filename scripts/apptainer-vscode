@@ -62,7 +62,7 @@ fi
 
 # Create a log file
 mkdir -p /tmp/vscode
-log_dir="/tmp/log/vscode"
+log_dir="/tmp/$USER/log/vscode"
 if [ -d "$log_dir" ]; then
   rm -rf "$log_dir"
 fi
