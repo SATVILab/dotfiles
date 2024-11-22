@@ -45,44 +45,35 @@ done
 
 # Prepare to copy hidden configuration files
 hidden_files=(".Renviron" ".lintr" ".radian_profile")
-files_to_copy=()
-differences=""
 
 for file in "${hidden_files[@]}"; do
     src="$HOME/dotfiles/$file"
     dest="$HOME/$file"
     if [ -e "$src" ]; then
         if [ ! -e "$dest" ] || ! cmp -s "$src" "$dest"; then
-            # Collect differences
+            # Display differences if the file exists
             if [ -e "$dest" ]; then
-                differences+="Differences in $file:\n"
-                differences+="$(diff "$dest" "$src")\n\n"
+                echo -e "\nDifferences in $file:"
+                diff "$dest" "$src"
             else
-                differences+="File $file does not exist in your home directory.\n\n"
+                echo -e "\nFile $file does not exist in your home directory."
             fi
-            files_to_copy+=("$file")
+            echo -e "\nDo you want to copy $file to your home directory? If you're really not sure, you should just say 'yes'. [y/N]"
+            read -p "Enter y or n: " confirm
+            confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+            if [ "$confirm" = "y" ] || [ "$confirm" = "yes" ]; then
+                cp "$src" "$dest"
+                echo "$file copied to home directory."
+            else
+                echo "Skipped copying $file."
+            fi
+        else
+            echo "$file is up to date."
         fi
     else
         echo "Source file $src does not exist. Skipping."
     fi
 done
-
-# If there are files to copy, ask the user
-if [ ${#files_to_copy[@]} -gt 0 ]; then
-    echo -e "The following R configuration files differ from your current ones or do not exist in your home directory:\n"
-    echo -e "$differences"
-    echo "Do you want to copy these files to your home directory? If you're really not sure, you should just say 'yes'. [y/N]"
-    read -p "Enter y or n: " confirm
-    confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
-    if [ "$confirm" = "y" ] || [ "$confirm" = "yes" ]; then
-        for file in "${files_to_copy[@]}"; do
-            cp "$HOME/dotfiles/$file" "$HOME/$file"
-            echo "$file copied to home directory."
-        done
-    else
-        echo "Skipped copying hidden configuration files."
-    fi
-fi
 
 # Check Git configuration
 git_name=$(git config --global user.name)
