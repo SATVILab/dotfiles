@@ -1,74 +1,72 @@
 #!/usr/bin/env bash
 
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Function to display usage information
 usage() {
-    echo "Usage: $0 [-c]"
-    echo "  -c                          : Copy hidden configuration files (.Renviron, .lintr, .radian_profile) to the home directory"
+    echo "Usage: $0"
     echo ""
     echo "Description:"
     echo "  This script updates the dotfiles repository on the HPC and re-runs the setup script to apply any updates."
     echo "  It ensures your environment is consistent with the latest version of your dotfiles."
     echo ""
-    echo "Examples:"
-    echo "  $0                          # Update dotfiles without copying hidden files"
-    echo "  $0 -c                       # Update dotfiles and copy hidden files"
+    echo "Example:"
+    echo "  $0                          # Update dotfiles"
     exit 0
 }
 
-
-# Parse the command-line options
-COPY_HIDDEN=false
-while getopts "ch" opt; do
+# Parse command-line options
+while getopts ":h" opt; do
   case ${opt} in
-    c )
-      COPY_HIDDEN=true
-      ;;
     h )
       usage
       ;;
     \? )
+      echo "Invalid option: -$OPTARG" >&2
       usage
       ;;
   esac
 done
 
-set -e
-
 ORIG_DIR="$PWD"
 PATH_DIR_DOTFILES="$HOME/dotfiles"
 echo "Updating dotfiles..."
-echo "ORIG_DIR: $ORIG_DIR"
-echo "PATH_DIR_DOTFILES: $PATH_DIR_DOTFILES"
+echo "Current directory: $ORIG_DIR"
+echo "Dotfiles directory: $PATH_DIR_DOTFILES"
 
-# Clone or pull the dotfiles repository
+# Clone or update the dotfiles repository
 if [ ! -d "$PATH_DIR_DOTFILES" ]; then
-    echo "Cloning dotfiles..."
+    echo "Cloning dotfiles repository..."
     git clone https://SATVILab/dotfiles.git "$PATH_DIR_DOTFILES"
-    echo "Dotfiles cloned"
+    echo "Dotfiles repository cloned."
 else
-    echo "Changing directory to $PATH_DIR_DOTFILES"
+    echo "Updating existing dotfiles repository..."
     cd "$PATH_DIR_DOTFILES"
-    echo "Pulling dotfiles..."
-    git pull origin main
-    echo "Dotfiles pulled"
+    DEFAULT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    git pull origin "$DEFAULT_BRANCH"
+    echo "Dotfiles repository updated."
 fi
 
 # Install the dotfiles
 echo "Installing dotfiles..."
-cd $HOME
-echo "Running install-hpc.sh"
+cd "$HOME"
 
-if [ "$COPY_HIDDEN" = "true" ]; then
-    dotfiles/install-hpc.sh -c
-else
-    dotfiles/install-hpc.sh
-fi
+# Ensure the install script is executable
+chmod +x "$HOME/dotfiles/install-hpc.sh"
 
-echo "Dotfiles installed"
+echo "Running install-hpc.sh..."
+"$HOME/dotfiles/install-hpc.sh"
+echo "Dotfiles installed."
+
+# Return to the original directory
 cd "$ORIG_DIR"
-echo "Dotfiles updated"
+echo "Returned to original directory: $ORIG_DIR"
 
+# Inform the user to source .bashrc manually
 if [[ -f "$HOME/.bashrc" ]]; then
-    echo "Sourcing .bashrc..."
-    source "$HOME/.bashrc"
-    echo ".bashrc sourced"
+    echo "To apply changes, please source your .bashrc or restart your shell:"
+    echo "    source ~/.bashrc"
 fi
+
+echo "Dotfiles update complete."
