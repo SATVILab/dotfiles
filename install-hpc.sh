@@ -53,20 +53,29 @@ for file in "${hidden_files[@]}"; do
         if [ ! -e "$dest" ] || ! cmp -s "$src" "$dest"; then
             # Display differences if the file exists
             if [ -e "$dest" ]; then
-                echo -e "\nDifferences in $file:"
+                echo -e "\n$file exists. Here are the differences in $file:"
                 diff "$dest" "$src"
+                echo -e "\nDo you want to overwrite $file in your home directory?"
+                echo -e "\nIf you're really not sure, then you should probably say no (and consider manually incorporating changes)."
             else
                 echo -e "\nFile $file does not exist in your home directory."
+                echo -e "\nDo you want to copy $file to your home directory?"
+                echo -e "\nIf you're really not sure, then you should probably say yes."
             fi
-            echo -e "\nDo you want to copy $file to your home directory? If you're really not sure, you should just say 'yes'. [y/N]"
-            read -p "Enter y or n: " confirm
-            confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
-            if [ "$confirm" = "y" ] || [ "$confirm" = "yes" ]; then
-                cp "$src" "$dest"
-                echo "$file copied to home directory."
-            else
-                echo "Skipped copying $file."
-            fi
+            while true; do
+                read -p "Enter y or n: " confirm
+                confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
+                if [ "$confirm" = "y" ] || [ "$confirm" = "yes" ]; then
+                    cp "$src" "$dest"
+                    echo "$file copied to home directory."
+                    break
+                elif [ "$confirm" = "n" ] || [ "$confirm" = "no" ]; then
+                    echo "Skipped copying $file."
+                    break
+                else
+                    echo "Invalid input. Please enter 'y' or 'n' (or 'yes' or 'no')."
+                fi
+            done
         else
             echo "$file is up to date."
         fi
