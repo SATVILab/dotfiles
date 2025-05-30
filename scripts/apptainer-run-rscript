@@ -1,23 +1,18 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+# bring in the shared finder logic
+source "$HOME/.local/bin/apptainer-common.sh"
 
-# Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [<command> ...]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "   -n, --no-append            : Don’t append branch to default SIF name"
-    echo "  <command>                   : Custom command to run with Rscript (enclose in single quotes to avoid issues with special characters)"
-    echo ""
-    echo "Description:"
-    echo "  This script runs an R script inside an Apptainer container. The command passed as an argument"
-    echo "  will be executed as an R script inside the specified container."
-    echo ""
-    echo "Examples:"
-    echo "  $0 -s mycontainer.sif 'print(\"Hello, World\!\")'"
-    echo "  $0 -d /custom/directory -s mycontainer.sif 'summary(data)'"
-    exit 0
+  cat <<EOF
+Usage: $0 [-s <sif>] [-d <directory>] [-n] -- <R expression>
+  -s, --sif <sif>          : Explicit SIF filename
+  -d, --directory <dir>    : Directory to search (optional)
+  -n, --no-append          : Don’t append branch suffix to default SIF name
+  <R expression>           : The R code to run via Rscript -e
+EOF
+  exit 1
 }
 
 # 1) Defaults
@@ -26,30 +21,30 @@ NO_APPEND=false
 DIRECTORY=""
 CUSTOM_EXPR=()
 
-# lower-case branch and cwd basename
+# lower-case branch and working-dir basename
 branch=$(apptainer_common_get_branch | tr '[:upper:]' '[:lower:]')
 base=$(basename "$PWD"      | tr '[:upper:]' '[:lower:]')
 
-# 2) Parse flags + capture trailing R expression
+# 2) Parse flags and collect trailing R expression
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -s|--sif)        SIF_NAME="$2";    shift 2;;
-    -d|--directory)  DIRECTORY="$2";   shift 2;;
-    -n|--no-append)  NO_APPEND=true;    shift;;
-    -h|--help)       usage;;
-    --)              shift; CUSTOM_EXPR=( "$@" ); break;;
-    -*|--*)          usage;;
-    *)               CUSTOM_EXPR+=( "$1" ); shift;;
+    -s|--sif)        SIF_NAME="$2";    shift 2 ;;
+    -d|--directory)  DIRECTORY="$2";   shift 2 ;;
+    -n|--no-append)  NO_APPEND=true;    shift   ;;
+    -h|--help)       usage ;;
+    --)              shift; CUSTOM_EXPR=( "$@" ); break ;;
+    -*|--*)          usage ;;
+    *)               CUSTOM_EXPR+=( "$1" ); shift ;;
   esac
 done
 
-# require an R expression
+# 3) Must have an R expression
 if (( ${#CUSTOM_EXPR[@]} == 0 )); then
   echo "Error: no R expression provided." >&2
   usage
 fi
 
-# 3) Compute default SIF_NAME if not provided
+# 4) Compute default SIF_NAME if not overridden
 if [[ -z "$SIF_NAME" ]]; then
   if $NO_APPEND; then
     SIF_NAME="${base}.sif"
@@ -58,7 +53,7 @@ if [[ -z "$SIF_NAME" ]]; then
   fi
 fi
 
-# 4) Locate the SIF file via common helper
+# 5) Locate the SIF via common helper
 find_args=( --sif "$SIF_NAME" )
 [[ -n "$DIRECTORY" ]] && find_args+=( --directory "$DIRECTORY" )
 
@@ -69,14 +64,14 @@ fi
 
 echo "Using SIF: $sif_path"
 
-# 5) Quote and combine the R expression, then run it
-#    so that embedded quotes and spaces survive
+# 6) Quote and assemble the R expression
 for i in "${!CUSTOM_EXPR[@]}"; do
   CUSTOM_EXPR[$i]=$(printf "%q" "${CUSTOM_EXPR[$i]}")
 done
 expr="${CUSTOM_EXPR[*]}"
 
-echo "Running Rscript -e \"$expr\""
+# 7) Run Rscript inside the container
+echo "Running: Rscript -e \"$expr\""
 apptainer exec "$sif_path" Rscript -e "$expr"
 
 echo "Rscript inside container completed successfully."
