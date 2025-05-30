@@ -1,69 +1,65 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+# bring in only the shared helpers
+source "$HOME/.local/bin/apptainer-common.sh"
 
-# Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-n] [<command> ...]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional, defaults to standard Apptainer locations)"
-    echo "  <command>                   : Custom command to run inside the container (optional, defaults to opening a shell)"
-    echo ""
-    echo "Description:"
-    echo "  This script runs a command inside an Apptainer container. If no command is provided,"
-    echo "  it opens an interactive shell within the container."
-    echo ""
-    echo "Examples:"
-    echo "  $0 -s mycontainer.sif echo 'Hello, World!'"
-    echo "  $0 -d /custom/directory -s mycontainer.sif"
-    exit 0
+  cat <<EOF
+Usage: $0 [-s <sif>] [-d <directory>] [-n] [--] [<command> ...]
+  -s, --sif <sif>          : Explicit SIF filename
+  -d, --directory <dir>    : Directory to search first
+  -n, --no-append          : Don’t append branch to default SIF name
+  <command>                : Command to run in the container (default: shell)
+EOF
+  exit 1
 }
 
-# Initialize default values
-SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+
+# 1) Defaults
+SIF_NAME=""
+NO_APPEND=false
 DIRECTORY=""
 CUSTOM_COMMAND=()
 
-# Parse named parameters and command
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -s|--sif) SIF_FILE="$2"; shift 2 ;;
-        -d|--directory) DIRECTORY="$2"; shift 2 ;;
-        -h|--help) usage ;;
-        --) shift; CUSTOM_COMMAND+=("$@"); break ;;
-        -*|--*) usage ;;
-        *) CUSTOM_COMMAND+=("$@"); break ;;
-    esac
+# get lowercase branch and cwd basename
+branch=$(apptainer_common_get_branch | tr '[:upper:]' '[:lower:]')
+base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
+
+# 2) Parse flags + capture any trailing command
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -s|--sif)      SIF_NAME="$2";   shift 2;;
+    -d|--directory) DIRECTORY="$2"; shift 2;;
+    -n|--no-append) NO_APPEND=true;  shift;;
+    -h|--help)     usage;;
+    --)            shift; CUSTOM_COMMAND=( "$@" ); break;;
+    -*|--*)        usage;;
+    *)             CUSTOM_COMMAND+=( "$1" ); shift;;
+  esac
 done
 
-# Ensure the SIF_FILE ends with .sif and convert to lowercase
-SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
-
-# Determine the base directories
-if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
-elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
-    SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
-else
-    SCRATCH_DIR=""
+# 3) Compute default SIF_NAME if not provided
+if [[ -z "$SIF_NAME" ]]; then
+  if $NO_APPEND; then
+    SIF_NAME="${base}.sif"
+  else
+    SIF_NAME="${base}-${branch}.sif"
+  fi
 fi
 
-if [ -d "$HOME/.local/share/apptainer/sif" ]; then
-    HOME_DIR="$HOME/.local/share/apptainer/sif"
-else
-    HOME_DIR=""
+# 4) Locate the SIF file
+find_args=( --sif "$SIF_NAME" )
+[[ -n "$DIRECTORY" ]] && find_args+=( --directory "$DIRECTORY" )
+
+if ! sif_path=$(apptainer_common_find_sif "${find_args[@]}"); then
+  echo "Error: could not locate SIF '$SIF_NAME'" >&2
+  exit 1
 fi
 
-# Create a log directory and log file
-SIF_FILE_BASENAME=$(basename "$SIF_FILE")
-log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
-mkdir -p "$log_dir"
-log_file="$log_dir/run_log_$(date '+%Y%m%d_%H%M%S').txt"
+echo "Using SIF: $sif_path"
 
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
-}
+# 5) Run inside the container
 
 # Quote each part of the custom command
 if [ "${#CUSTOM_COMMAND[@]}" -gt 0 ]; then
@@ -71,49 +67,12 @@ if [ "${#CUSTOM_COMMAND[@]}" -gt 0 ]; then
         CUSTOM_COMMAND[$i]=$(printf "%q" "${CUSTOM_COMMAND[$i]}")
     done
     CUSTOM_COMMAND_STRING="${CUSTOM_COMMAND[*]}"
-fi
-
-# Determine the full path of the SIF file
-if [ -n "$DIRECTORY" ]; then
-    SIF_PATH="$DIRECTORY/$SIF_FILE"
-elif [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
-elif [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$HOME_DIR/$SIF_FILE"
-else
-    log "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "To view the log file, run:"
-    echo "cat $log_file"
-    exit 1
-fi
-
-# Log the parsed options
-log "Options:"
-log "  SIF File: $SIF_FILE"
-log "  Directory: $DIRECTORY"
-log "  Scratch Directory: $SCRATCH_DIR"
-log "  Home Directory: $HOME_DIR"
-log "  SIF Path: $SIF_PATH"
-log "  Custom Command: $CUSTOM_COMMAND_STRING"
-log "  Log File: $log_file"
-
-# Function to handle errors and log the location of the log file
-error_handler() {
-    log "An error occurred. See the log file for details: $log_file"
-    echo "To view the log file, run:"
-    echo "cat $log_file"
-    exit 1
-}
-
-# Trap errors to run the error handler
-trap 'error_handler' ERR
-
-if [ -n "$CUSTOM_COMMAND_STRING" ]; then
-    log "Running Apptainer image with custom command: $CUSTOM_COMMAND_STRING from '$SIF_PATH'"
+    echo "Running custom command: $CUSTOM_COMMAND_STRING"
     apptainer exec "$SIF_PATH" bash -c "$CUSTOM_COMMAND_STRING"
 else
-    log "Running Apptainer image in shell mode from '$SIF_PATH'"
-    apptainer shell "$SIF_PATH"
+  echo "Opening interactive shell…"
+  apptainer shell "$sif_path"
 fi
 
-log "Apptainer run process completed successfully"
+
+echo "Run apptainer command completed successfully."
