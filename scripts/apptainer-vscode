@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [-V|--vscode-version <version>]"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [-V|--vscode-version <version>]"   
     echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
     echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"

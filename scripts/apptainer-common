@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -e
+
+get_branches() { … }
+get_default_sif_candidates() { … }
+populate_candidates() { … }
+get_cache_dirs() { … }
+populate_dirs() { … }
+
+# find_sif [--sif SIFNAME] [--directory DIR] [--preserve-case]
+#   Exports $SIF_PATH or exits 1.
+find_sif() {
+  # call populate_candidates & populate_dirs here
+  populate_candidates
+  populate_dirs
+  SIF_PATH=""
+  for cand in "${candidates[@]}"; do
+    for dir in "${base_dirs[@]}"; do
+      [[ -f "$dir/$cand" ]] && {
+        SIF_PATH="$dir/$cand"
+        return 0
+      }
+    done
+  done
+  return 1
+}

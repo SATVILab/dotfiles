@@ -4,8 +4,9 @@ set -e
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to check (defaults to the current directory name)"
+    echo "Usage: $0 [-s <sif>] [-d <directory>] [-p]"
+    echo "  -s, --sif <sif>             : Name of the SIF file to check (if not specified, then first checks for <current directory name>-<branch>.sif (if in a Git repo) and second <directory_name>.sif)"
+    echo "  -p, --preserve-case         : Do not convert the SIF filename to lowercase (default is to convert to lowercase)"
     echo "  -d, --directory <directory> : Directory to search for the SIF file (checked before default directories)"
     echo ""
     echo "Description:"
@@ -19,85 +20,154 @@ usage() {
 }
 
 
-# Initialize default values
-SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
-DIRECTORY=""
-
-# Parse named parameters
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -s|--sif) SIF_FILE="$2"; shift ;;
-        -d|--directory) DIRECTORY="$2"; shift ;;
-        -h|--help) usage ;;
-        *) usage ;;
-    esac
-    shift
-done
-
-# Ensure the SIF_FILE ends with .sif and convert to lowercase
-SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
-
-# Determine the base directories
-if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
-elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
-    SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
-else
-    SCRATCH_DIR=""
-fi
-
-if [ -d "$HOME/.local/share/apptainer/sif" ]; then
-    HOME_DIR="$HOME/.local/share/apptainer/sif"
-else
-    HOME_DIR=""
-fi
-
-# Create a log directory and log file
-SIF_FILE_BASENAME=$(basename "$SIF_FILE")
-log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
-mkdir -p "$log_dir"
-log_file="$log_dir/exists_log_$(date '+%Y%m%d_%H%M%S').txt"
-
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
+# Return “main master” or the current branch
+get_branches() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null \
+     || ! git symbolic-ref --quiet HEAD 2>/dev/null; then
+    echo main master
+  else
+    git rev-parse --abbrev-ref HEAD | tr '/' '_'
+  fi
 }
 
-# Log the parsed options
-log "Options:"
-log "  SIF File: $SIF_FILE"
-log "  Directory: $DIRECTORY"
-log "  Scratch Directory: $SCRATCH_DIR"
-log "  Home Directory: $HOME_DIR"
-log "  Log File: $log_file"
+# Emit all default candidates, one per line:
+#   dirname-<branch>.sif  (for each branch)
+#   dirname.sif
+get_default_sif_candidates() {
+  local base
+  base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
+  for br in $(get_branches); do
+    echo "${base}-${br}.sif"
+  done
+  echo "${base}.sif"
+}
 
-# Determine the full path of the SIF file and check for existence
-SIF_PATH=""
 
-# Determine the full path of the SIF file and check for existence
-SIF_PATH=""
-
-if [ -n "$DIRECTORY" ]; then
-    if [ -f "$DIRECTORY/$SIF_FILE" ]; then
-        SIF_PATH="$DIRECTORY/$SIF_FILE"
+populate_candidates() {
+  # If user gave -s, use exactly that one entry…
+  if $SIF_SPECIFIED; then
+    # ensure “.sif” suffix
+    SIF_FILE="${SIF_FILE%.sif}.sif"
+    # lowercase unless they want to preserve case
+    if ! $PRESERVE_CASE; then
+      SIF_FILE=$(echo "$SIF_FILE" | tr '[:upper:]' '[:lower:]')
     fi
-fi
+    candidates=( "$SIF_FILE" )
+  else
+    # otherwise pull in all defaults…
+    mapfile -t candidates < <(get_default_sif_candidates)
+    # …and lowercase them unless PRESERVE_CASE
+    if ! $PRESERVE_CASE; then
+      for i in "${!candidates[@]}"; do
+        candidates[$i]=$(echo "${candidates[$i]}" | tr '[:upper:]' '[:lower:]')
+      done
+    fi
+  fi
+}
 
-if [ -z "$SIF_PATH" ] && [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
-elif [ -z "$SIF_PATH" ] && [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$HOME_DIR/$SIF_FILE"
-fi
+populate_dirs() {
+  # Build the list of directories to search:
+  if [[ -n "$DIRECTORY" ]]; then
+    # User explicitly asked for one directory only
+    base_dirs=( "$DIRECTORY" )
+  else
+    # No -d: use all valid cache dirs
+    mapfile -t base_dirs < <(get_cache_dirs)
+  fi
 
-
-if [ -n "$SIF_PATH" ] && [ -f "$SIF_PATH" ]; then
-    log "SIF file '$SIF_PATH' exists."
-    echo "SIF file '$SIF_PATH' exists."
-    log "Apptainer exists check completed successfully"
-else
-    log "Warning: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "Warning: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "To view the log file, run:"
-    echo "cat $log_file"
+  if (( ${#base_dirs[@]} == 0 )); then
+    echo "Error: no directories to search (set APPTAINER_CACHE_DIR or create ~/.local/share/apptainer/sif)" >&2
     exit 1
-fi
+  fi
+}
+
+# Return an array of existing Apptainer‐cache directories
+get_cache_dirs() {
+  local dirs=()
+
+  # If APPTAINER_CACHE_DIR is set, use it; otherwise check /scratch
+  if [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then
+    dirs+=( "$APPTAINER_CACHE_DIR" )
+  elif [[ -d "/scratch/$USER/.local/share/apptainer/sif" ]]; then
+    dirs+=( "/scratch/$USER/.local/share/apptainer/sif" )
+  fi
+
+  # Always include the home cache if it exists
+  if [[ -d "$HOME/.local/share/apptainer/sif" ]]; then
+    dirs+=( "$HOME/.local/share/apptainer/sif" )
+  fi
+
+  # Print one per line for mapfile
+  printf '%s\n' "${dirs[@]}"
+}
+
+check_sif_exists() {
+  # --- search for the first existing .sif ---
+  
+
+
+
+  SIF_PATH=""
+  for cand in "${candidates[@]}"; do
+    for dir in "${base_dirs[@]}"; do
+      echo "Checking for '$cand' in '$dir'…"
+      if [[ -f "$dir/$cand" ]]; then
+        SIF_PATH="$dir/$cand"
+        echo "→ Found: $SIF_PATH"
+        break 2
+      fi
+    done
+  done
+
+  if [[ -n "$SIF_PATH" ]]; then
+    echo "Using container image: $SIF_PATH"
+    exit 0
+  else
+    echo "Error: none of the candidates were found."
+    echo "Searched for: ${candidates[*]}"
+    echo "In directories: ${base_dirs[*]}"
+    exit 1
+  fi
+}
+
+
+
+# -- Main script starts here ---
+
+# 1) parse args
+SIF_SPECIFIED=false
+PRESERVE_CASE=false
+DIRECTORY=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -s|--sif)
+      SIF_FILE="$2"
+      SIF_SPECIFIED=true
+      shift 2
+      ;;
+    -d|--directory)
+      DIRECTORY="$2"
+      shift 2
+      ;;
+    -p|--preserve-case)
+      PRESERVE_CASE=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      usage
+      ;;
+  esac
+done
+
+# 2) populate candidates
+populate_candidates
+
+# 3) populate directories
+populate_dirs
+
+# 4) check sif exists
+check_sif_exists
