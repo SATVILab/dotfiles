@@ -2,7 +2,7 @@
 set -e
 
 # bring in only those shared functions—no globals leak here
-source ~/.local/bin/apptainer-common.sh
+source "$HOME/.local/bin/apptainer-common.sh"
 
 usage() {
   cat<<EOF
