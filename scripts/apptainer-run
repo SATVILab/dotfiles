@@ -15,7 +15,6 @@ EOF
   exit 1
 }
 
-
 # 1) Defaults
 SIF_NAME=""
 NO_APPEND=false
@@ -58,6 +57,7 @@ if ! sif_path=$(apptainer_common_find_sif "${find_args[@]}"); then
 fi
 
 echo "Using SIF: $sif_path"
+
 
 # 5) Run inside the container
 
