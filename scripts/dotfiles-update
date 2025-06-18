@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat <<EOF
+Usage: $0 <env>
+
+<env> must be one of:
+  hpc    – for your HPC setup
+  wsl    – for your WSL (devcontainer) setup
+
+Description:
+  Updates (or clones) the dotfiles repository and re-runs
+  the install-<env>.sh script to apply any updates.
+
+Example:
+  $0 hpc
+  $0 wsl
+EOF
+  exit 1
+}
+
+# require exactly one argument
+if [[ $# -ne 1 ]]; then
+  usage
+fi
+
+env="$1"
+case "$env" in
+  hpc|wsl|dev) ;;
+  *)
+    echo "Error: invalid environment '$env'. Use 'hpc', 'wsl' or 'dev'." >&2
+    usage
+    ;;
+esac
+
+ORIG_DIR="$PWD"
+DOTFILES_DIR="$HOME/dotfiles"
+
+echo "=== Updating dotfiles in $DOTFILES_DIR ==="
+if [[ ! -d "$DOTFILES_DIR" ]]; then
+  echo "Cloning dotfiles repository..."
+  git clone https://SATVILab/dotfiles.git "$DOTFILES_DIR"
+else
+  echo "Pulling latest changes..."
+  cd "$DOTFILES_DIR"
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  git pull origin "$branch"
+fi
+
+echo
+echo "=== Running install for '$env' ==="
+install_script="$DOTFILES_DIR/install-${env}.sh"
+if [[ ! -f "$install_script" ]]; then
+  echo "Error: $install_script not found." >&2
+  exit 1
+fi
+
+chmod +x "$install_script"
+"$install_script"
+
+echo
+cd "$ORIG_DIR"
+echo "Returned to original directory: $ORIG_DIR"
+
+if [[ -f "$HOME/.bashrc" ]]; then
+  echo
+  echo "To apply changes, please source your .bashrc or restart your shell:"
+  echo "    source ~/.bashrc"
+fi
+
+echo
+echo "Dotfiles update complete for '$env'."
