@@ -29,12 +29,12 @@ EOF
 
 parse_args() {
   [[ $# -eq 1 ]] || usage
-  env="$1"
-  case "$env" in
+  dotfiles_env="$1"
+  case "$dotfiles_env" in
     hpc|linux|wsl|dev|codespace|codespaces) ;;
-    *) echo "Error: invalid environment '$env'." >&2; usage ;;
+    *) echo "Error: invalid environment '$dotfiles_env'." >&2; usage ;;
   esac
-  if [[ "$env" == "codespaces" ]]; then
+  if [[ "$dotfiles_env" == "codespaces" ]]; then
     env="codespace"
   fi
 }
@@ -64,10 +64,12 @@ prepare_directories() {
 # -----------------------------------------------------------------------------
 normalize_dotfiles() {
   echo "Normalising line endings and permissions in dotfiles…"
+  local dotfiles_dir
+  dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   if command -v dos2unix &>/dev/null; then
-    find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec dos2unix {} +
+    find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec dos2unix {} +
   fi
-  find "$HOME/dotfiles/scripts" "$HOME/dotfiles/bashrc.d" -type f -exec chmod +x {} +
+  find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec chmod +x {} +
 }
 
 # -----------------------------------------------------------------------------
@@ -76,9 +78,11 @@ normalize_dotfiles() {
 copy_scripts() {
   echo "Copying scripts to ~/.local/bin…"
   shopt -s nullglob
-  for script in "$HOME/dotfiles/scripts/"*; do
+  local dotfiles_dir
+  dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  for script in "$dotfiles_dir/scripts/"*; do
     name=$(basename "$script")
-    case "$env" in
+    case "$dotfiles_env" in
       hpc)
         cp "$script" "$HOME/.local/bin/" ;;
       wsl)
@@ -93,13 +97,13 @@ copy_scripts() {
         fi
         cp "$script" "$HOME/.local/bin/" ;;
       codespace)
-        if [[ "$name" == slurm* || "$name" == apptainer-* ]]; then
+        if [[ "$name" == slurm* || "$name" == apptainer-* || "$name" == "dotfiles-update" ]]; then
           echo "  Skipping $name"; continue
         fi
         cp "$script" "$HOME/.local/bin/" ;;
     esac
   done
-  shopt -s nullglob
+  shopt -u nullglob
 }
 
 # -----------------------------------------------------------------------------
@@ -107,12 +111,14 @@ copy_scripts() {
 # -----------------------------------------------------------------------------
 copy_bashrc_fragments() {
   echo "Copying bashrc.d fragments…"
+  local dotfiles_dir
+  dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   shopt -s nullglob
-  for file in "$HOME/dotfiles/bashrc.d/"*; do
+  for file in "$dotfiles_dir/bashrc.d/"*; do
     filename=$(basename "$file")
 
     # skip HPC-only fragments in non-hpc envs
-    if [[ "$env" != hpc && "$filename" == hpc-* ]]; then
+    if [[ "$dotfiles_env" != hpc && "$filename" == hpc-* ]]; then
       echo "  Skipping $filename (HPC-specific)"
       continue
     fi
@@ -127,13 +133,13 @@ copy_bashrc_fragments() {
       # but we still want to export GITHUB_PAT as GH_TOKEN,
       # for example, if it's not yet set, so we didn't
       # skip the copy step above.
-      if [[ "$filename" == login.sh && "$env" != codespace ]]; then
+      if [[ "$filename" == login.sh && "$dotfiles_env" != codespace ]]; then
         echo "  Configuring $filename"
         configure_login
       fi
     fi
   done
-  shopt -s nullglob
+  shopt -u nullglob
 }
 
 
@@ -170,20 +176,23 @@ configure_login() {
 # Copy hidden config files, sanitising .Renviron for wsl/dev
 # -----------------------------------------------------------------------------
 copy_hidden_configs_r() {
-  local files=( .Renviron .lintr .radian_profile )
+  
   echo "Copying hidden config files…"
 
   # If in dev or codespaces, and R not available, skip copying R configs
-  if [[ "$env" == "dev" || "$env" == "codespace" ]]; then
+  if [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]; then
     if ! command -v R &> /dev/null; then
-      echo "R not found, skipping all R config files in $env environment."
+      echo "R not found, skipping all R config files in $dotfiles_env environment."
       return
     fi
   fi
 
+  local files=( .Renviron .lintr .radian_profile )
+  local dotfiles_dir
+  dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
   for file in "${files[@]}"; do
-    local src="$HOME/dotfiles/$file" dest="$HOME/$file"
+    local src="$dotfiles_dir/r/$file" dest="$HOME/$file"
     [[ -e "$src" ]] || { echo "  $file not found, skipping"; continue; }
 
     if [[ ! -e "$dest" ]] || ! cmp -s "$src" "$dest"; then
@@ -203,7 +212,7 @@ copy_hidden_configs_r() {
           y|yes)
             # .Renviron by default specifies the /scratch directory,
             # which is HPC-specific.
-            if [[ "$file" == ".Renviron" && "$env" != "hpc" ]]; then
+            if [[ "$file" == ".Renviron" && "$dotfiles_env" != "hpc" ]]; then
               sed -E \
                 '/^(RENV_PATHS_LIBRARY_ROOT|RENV_PATHS_CACHE|RENV_PATHS_ROOT|R_LIBS)=/d' \
                 "$src" > "$dest"
@@ -246,7 +255,7 @@ configure_git() {
   }
 
   # Choose default email domain by environment
-  case "$env" in
+  case "$dotfiles_env" in
     hpc)       def_email="$USER@hpc.auto" ;;
     wsl)       def_email="$USER@wsl.local" ;;
     dev)       def_email="$USER@dev.local" ;;
@@ -262,13 +271,21 @@ configure_git() {
 # Print final success message
 # -----------------------------------------------------------------------------
 print_completion() {
-  case "$env" in
+  case "$dotfiles_env" in
     hpc)    echo "HPC setup complete." ;;
     linux)  echo "Linux setup complete." ;;
     wsl)    echo "WSL setup complete." ;;
     dev)    echo "Devcontainer setup complete." ;;
     codespace) echo "Codespace setup complete." ;;
   esac
+}
+
+# -----------------------------------------------------------------------------
+# Unset the dotfiles_env variable to avoid conflicts
+# -----------------------------------------------------------------------------
+
+unset_dotfiles_env() {
+  unset dotfiles_env
 }
 
 # -----------------------------------------------------------------------------
@@ -284,6 +301,7 @@ main() {
   copy_hidden_configs_r
   configure_git
   print_completion
+  unset_dotfiles_env
 }
 
 main "$@"
