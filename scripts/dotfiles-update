@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# dotfiles-update.sh — update and run unified installer for dotfiles
+
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Print usage information
+# -----------------------------------------------------------------------------
+usage() {
+  cat <<EOF
+Usage: $0 <env>
+
+<env> must be one of:
+  hpc    – for your HPC setup
+  wsl    – for your WSL (devcontainer) setup
+  dev    – for your Devcontainer (WSL) setup
+
+Description:
+  Clones or updates the dotfiles repo and then invokes
+  install-env.sh with the chosen environment.
+
+Example:
+  $0 hpc
+  $0 wsl
+  $0 dev
+EOF
+  exit 1
+}
+
+# -----------------------------------------------------------------------------
+# Parse and validate command-line arguments
+# -----------------------------------------------------------------------------
+parse_args() {
+  [[ $# -eq 1 ]] || usage
+  env="$1"
+  case "$env" in
+    hpc|wsl|dev) ;;
+    *)
+      echo "Error: invalid environment '$env'." >&2
+      usage
+      ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
+# Clone the repo if missing, or pull latest changes
+# -----------------------------------------------------------------------------
+update_repo() {
+  DOTFILES_DIR="$HOME/dotfiles"
+  echo "=== Updating dotfiles in $DOTFILES_DIR ==="
+  if [[ ! -d "$DOTFILES_DIR" ]]; then
+    echo "Cloning dotfiles repository..."
+    git clone https://SATVILab/dotfiles.git "$DOTFILES_DIR"
+  else
+    echo "Pulling latest changes..."
+    pushd "$DOTFILES_DIR" >/dev/null
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    git pull origin "$branch"
+    popd >/dev/null
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# Invoke the unified installer script
+# -----------------------------------------------------------------------------
+run_installer() {
+  installer="$HOME/dotfiles/install-env.sh"
+  echo
+  echo "=== Running unified installer for '$env' ==="
+  if [[ ! -f "$installer" ]]; then
+    echo "Error: $installer not found." >&2
+    exit 1
+  fi
+  chmod +x "$installer"
+  "$installer" "$env"
+}
+
+# -----------------------------------------------------------------------------
+# Return to the original directory
+# -----------------------------------------------------------------------------
+restore_pwd() {
+  echo
+  cd "$ORIG_DIR"
+  echo "Returned to original directory: $ORIG_DIR"
+}
+
+# -----------------------------------------------------------------------------
+# Remind the user to source their shell
+# -----------------------------------------------------------------------------
+remind_source() {
+  if [[ -f "$HOME/.bashrc" ]]; then
+    echo
+    echo "To apply changes, please source your .bashrc or restart your shell:"
+    echo "    source ~/.bashrc"
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# Main entrypoint
+# -----------------------------------------------------------------------------
+main() {
+  parse_args "$@"
+  ORIG_DIR="$PWD"
+
+  update_repo
+  run_installer
+
+  restore_pwd
+  remind_source
+
+  echo
+  echo "Dotfiles update complete for '$env'."
+}
+
+main "$@"

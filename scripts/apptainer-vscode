@@ -1,121 +1,77 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
-# Function to display usage
+# bring in the shared finder logic
+source "$HOME/.local/bin/apptainer-common.sh"
+
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>] [-c|--clean] [-V|--vscode-version <version>]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to run (optional; defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (optional)"
-    echo "  -c, --clean                 : Start clean by killing, pruning, and unregistering existing tunnels"
-    echo "  -V, --vscode-version <version>  : Specify the VS Code version to install (default: latest)"
-    echo ""
-    echo "Example: $0 -s mycontainer --clean"
-    exit 1
+  cat <<EOF
+Usage: $0 [-s <sif>] [-d <directory>] [-c] [-V <vscode_version>]
+  -s, --sif <sif>             : Explicit SIF filename
+  -d, --directory <dir>       : Directory to search first
+  -c, --clean                 : Kill/prune/unregister existing VS Code tunnels before starting
+  -V, --vscode-version <ver>  : Version of VS Code to install (default: latest)
+EOF
+  exit 1
 }
 
-# Initialize default values
-SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
+# 1) Defaults
+SIF_NAME=""
 DIRECTORY=""
 CLEAN=false
-VSCODE_VERSION="latest"  # Default to latest version if not specified
+VSCODE_VERSION="latest"
 
-# Parse named parameters and command
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -s|--sif) SIF_FILE="$2"; shift 2 ;;
-        -d|--directory) DIRECTORY="$2"; shift 2 ;;
-        -c|--clean) CLEAN=true; shift ;;
-        -V|--vscode-version) VSCODE_VERSION="$2"; shift 2 ;;  # Parse VSCode version
-        -h|--help) usage ;;
-        -*|--*) usage ;;
-    esac
+# 2) Parse flags
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -s|--sif)          SIF_NAME="$2";        shift 2;;
+    -d|--directory)    DIRECTORY="$2";       shift 2;;
+    -c|--clean)        CLEAN=true;           shift;;
+    -V|--vscode-version) VSCODE_VERSION="$2"; shift 2;;
+    -h|--help)         usage;;
+    *)                 usage;;
+  esac
 done
 
-PATH_CLI="$HOME/.local/bin/code"
+# 3) Locate the SIF via common helper
+find_args=( --sif "$SIF_NAME" )
+[[ -n "$DIRECTORY" ]] && find_args+=( --directory "$DIRECTORY" )
 
-# Ensure the SIF_FILE ends with .sif and convert to lowercase
-SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
-
-# Determine the full path of the SIF file
-SIF_PATH=""
-if [ -n "$DIRECTORY" ]; then
-    SIF_PATH="$DIRECTORY/$SIF_FILE"
+if ! sif_path=$(apptainer_common_find_sif "${find_args[@]}"); then
+  echo "Error: could not locate SIF '${SIF_NAME:-<default>}'" >&2
+  exit 1
 fi
+echo "Using SIF: $sif_path"
 
-if [ -n "$APPTAINER_CACHE_DIR" ] && [ ! -f "$SIF_PATH" ]; then
-    SIF_PATH="$APPTAINER_CACHE_DIR/$SIF_FILE"
-fi
-
-if [ ! -f "$SIF_PATH" ]; then
-    SIF_PATH="/scratch/$USER/.local/share/apptainer/sif/$SIF_FILE"
-fi
-
-if [ ! -f "$SIF_PATH" ]; then
-    SIF_PATH="$HOME/.local/share/apptainer/sif/$SIF_FILE"
-fi
-
-if [ ! -f "$SIF_PATH" ]; then
-    echo "Error: SIF file '$SIF_FILE' not found in any specified or default directories."
-    exit 1
-fi
-
-# Create a log file
-mkdir -p /tmp/vscode
-log_dir="/tmp/$USER/log/vscode"
-if [ -d "$log_dir" ]; then
-  rm -rf "$log_dir"
-fi
-mkdir -p "$log_dir"
-log_file="$log_dir/log_$(date '+%Y%m%d_%H%M%S').txt"
-echo "See $log_file for logs"
-
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$log_file"
-}
-
-# Log the parsed options
-log "Options:"
-log "  SIF File: $SIF_FILE"
-log "  Directory: $DIRECTORY"
-log "  Clean: $CLEAN"
-log "  Path to CLI: $PATH_CLI"
-log "  VS Code Version: $VSCODE_VERSION"
-log "  Log File: $log_file"
-
-# Install VSCode if it doesn't exist
-if [ ! -f "$PATH_CLI" ]; then
-    log "VSCode CLI not found, installing..."
-    if [ ! -x "$HOME/.local/bin/install-vscode" ]; then
-        echo "Error: install-vscode script not found or not executable at $HOME/.local/bin/install-vscode"
-        exit 1
-    fi
-    apptainer exec "$SIF_PATH" "$HOME/.local/bin/install-vscode" -V "$VSCODE_VERSION"
+# 4) Ensure 'code' CLI
+CLI_PATH="$HOME/.local/bin/code"
+if [[ ! -x "$CLI_PATH" ]]; then
+  echo "'code' CLI not found, installing VS Code $VSCODE_VERSION..."
+  apptainer exec "$sif_path" install-vscode.sh -V "$VSCODE_VERSION" -b "$HOME/.local/bin"
 else
-    # Update VSCode CLI if needed
-    log "Updating VSCode CLI..."
-    apptainer exec "$SIF_PATH" "$PATH_CLI" update || log "VSCode CLI is already up to date or update failed."
-    log "Update complete"
+  echo "Updating VS Code CLI (if needed)..."
+  apptainer exec "$sif_path" "$CLI_PATH" update || \
+    echo "→ update either succeeded or was not needed"
 fi
 
-# Clean up existing tunnels if requested
-if [ "$CLEAN" == "true" ]; then
-    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill || true
+# 5) Clean up existing tunnels if requested
+if $CLEAN; then
+  echo "Cleaning up existing VS Code tunnels..."
+  for cmd in kill prune unregister; do
+    apptainer exec "$sif_path" "$CLI_PATH" tunnel $cmd || true
     sleep 1
-    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel prune || true
-    sleep 1
-    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel unregister || true
+  done
 fi
 
+# ensure we stop tunnels on exit
 cleanup() {
-    log "Stopping currently running tunnels"
-    apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel kill || log "Attempted to kill running tunnels"
-    log "Stopped currently running tunnels"
+  echo "Stopping any running VS Code tunnels..."
+  apptainer exec "$sif_path" "$CLI_PATH" tunnel kill || true
 }
+trap cleanup EXIT
 
-trap 'cleanup' EXIT
+# 6) Start the VS Code tunnel
+echo "Starting VS Code tunnel..."
+apptainer exec "$sif_path" "$CLI_PATH" tunnel --accept-server-license-terms
 
-# Execute the prepared command inside the Apptainer container
-log "Starting VS Code tunnel inside Apptainer container..."
-apptainer exec "$SIF_PATH" "$PATH_CLI" tunnel --accept-server-license-terms
+echo "VS Code tunnel is up. Connect using 'code' CLI as usual."

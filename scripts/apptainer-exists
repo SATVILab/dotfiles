@@ -1,103 +1,35 @@
 #!/usr/bin/env bash
-
 set -e
 
-# Function to display usage
+# bring in only those shared functions—no globals leak here
+source "$HOME/.local/bin/apptainer-common.sh"
+
 usage() {
-    echo "Usage: $0 [-s <sif>] [-d <directory>]"
-    echo "  -s, --sif <sif>             : Name of the SIF file to check (defaults to the current directory name)"
-    echo "  -d, --directory <directory> : Directory to search for the SIF file (checked before default directories)"
-    echo ""
-    echo "Description:"
-    echo "  This script checks if a specified Apptainer Image File (SIF) exists in the given directory or"
-    echo "  in the default Apptainer cache locations. Useful for ensuring a container is available before use."
-    echo ""
-    echo "Examples:"
-    echo "  $0 -s mycontainer.sif"
-    echo "  $0 -s mycontainer.sif -d /custom/directory"
-    exit 1
+  cat<<EOF
+Usage: $0 [-s <sif>] [-d <directory>] [-p]
+  -s, --sif           : Explicit sif name
+  -d, --directory     : Directory to search first
+  -p, --preserve-case : Don’t lowercase the name
+EOF
+  exit 1
 }
 
-
-# Initialize default values
-SIF_FILE="$(basename "$PWD" | tr '[:upper:]' '[:lower:]').sif"
-DIRECTORY=""
-
-# Parse named parameters
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -s|--sif) SIF_FILE="$2"; shift ;;
-        -d|--directory) DIRECTORY="$2"; shift ;;
-        -h|--help) usage ;;
-        *) usage ;;
-    esac
-    shift
+# parse your flags into args_for_common
+args_for_common=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -s|--sif)           args_for_common+=(--sif "$2");   shift 2;;
+    -d|--directory)     args_for_common+=(--directory "$2"); shift 2;;
+    -p|--preserve-case) args_for_common+=(--preserve-case); shift;;
+    -h|--help)          usage;;
+    *)                  usage;;
+  esac
 done
 
-# Ensure the SIF_FILE ends with .sif and convert to lowercase
-SIF_FILE="$(echo "${SIF_FILE%.sif}.sif" | tr '[:upper:]' '[:lower:]')"
-
-# Determine the base directories
-if [ -n "$APPTAINER_CACHE_DIR" ]; then
-    SCRATCH_DIR="$APPTAINER_CACHE_DIR"
-elif [ -d "/scratch/$USER/.local/share/apptainer/sif" ]; then
-    SCRATCH_DIR="/scratch/$USER/.local/share/apptainer/sif"
+if sif_path=$(apptainer_common_find_sif "${args_for_common[@]}"); then
+  echo "Found: $sif_path"
+  exit 0
 else
-    SCRATCH_DIR=""
-fi
-
-if [ -d "$HOME/.local/share/apptainer/sif" ]; then
-    HOME_DIR="$HOME/.local/share/apptainer/sif"
-else
-    HOME_DIR=""
-fi
-
-# Create a log directory and log file
-SIF_FILE_BASENAME=$(basename "$SIF_FILE")
-log_dir="${SCRATCH_DIR:-$HOME/.local/share/apptainer/sif}/logs/${SIF_FILE_BASENAME%.sif}"
-mkdir -p "$log_dir"
-log_file="$log_dir/exists_log_$(date '+%Y%m%d_%H%M%S').txt"
-
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$log_file"
-}
-
-# Log the parsed options
-log "Options:"
-log "  SIF File: $SIF_FILE"
-log "  Directory: $DIRECTORY"
-log "  Scratch Directory: $SCRATCH_DIR"
-log "  Home Directory: $HOME_DIR"
-log "  Log File: $log_file"
-
-# Determine the full path of the SIF file and check for existence
-SIF_PATH=""
-
-# Determine the full path of the SIF file and check for existence
-SIF_PATH=""
-
-if [ -n "$DIRECTORY" ]; then
-    if [ -f "$DIRECTORY/$SIF_FILE" ]; then
-        SIF_PATH="$DIRECTORY/$SIF_FILE"
-    fi
-fi
-
-if [ -z "$SIF_PATH" ] && [ -n "$SCRATCH_DIR" ] && [ -f "$SCRATCH_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$SCRATCH_DIR/$SIF_FILE"
-elif [ -z "$SIF_PATH" ] && [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/$SIF_FILE" ]; then
-    SIF_PATH="$HOME_DIR/$SIF_FILE"
-fi
-
-
-if [ -n "$SIF_PATH" ] && [ -f "$SIF_PATH" ]; then
-    log "SIF file '$SIF_PATH' exists."
-    echo "SIF file '$SIF_PATH' exists."
-    log "Apptainer exists check completed successfully"
-else
-    log "Warning: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "Warning: SIF file '$SIF_FILE' not found in any specified or default directories."
-    echo "To view the log file, run:"
-    echo "cat $log_file"
-    exit 1
+  echo "Error: no SIF found" >&2
+  exit 1
 fi

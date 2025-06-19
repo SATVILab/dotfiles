@@ -1,178 +1,188 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+# Load shared helpers (must define apptainer_common_get_cache_dirs)
+source "$HOME/.local/bin/apptainer-common.sh"
 
-# Function to display usage
 usage() {
-    echo "Usage: $0 -R <registry> -u <user> -o <org> -p <password> -r <repo> [-t <tag>] [-s <sif_name>] [-b <base_dir>] [-f]"
-    echo "  -R, --registry <registry>  : Registry to pull from ('docker' or 'ghcr'; optional, defaults to 'ghcr')"
-    echo "  -r, --repo <repo>          : Repository name (optional; defaults to current director's basename)"
-    echo "  -u, --user <user>          : Username for GitHub or Docker (required)"
-    echo "  -o, --org <org>            : Organisation or username override for image (optional, defaults to 'user')"
-    echo "  -p, --password <password>  : Password or token (optional, for 'ghrc' it defaults to GH_TOKEN, GITHUB_TOKEN, or GITHUB_PAT environment variables)"
-    echo "  -t, --tag <tag>            : Tag (optional, defaults to 'latest')"
-    echo "  -s, --sif <sif_name>       : SIF file name (optional, defaults to <repo>-<tag>.sif if <tag> was specified and <repo>.sif otherwise)"
-    echo "  -b, --base_dir <base_dir>  : Base directory for storing the SIF file (optional, defaults to standard Apptainer cache directories)"
-    echo "  -f, --force                : Force download and overwrite existing SIF file"
-    echo ""
-    echo "Description:"
-    echo "  This script pulls an Apptainer image from Docker or the GitHub Container Registry and saves it locally as a SIF file."
-    echo "  It uses the provided credentials and repository information to locate and download the image."
-    echo ""
-    echo "Examples:"
-    echo "  $0 -u yourghcruser"
-    echo "  $0 -o yourorg -p yourpassword - yourrepo"
-    echo "  $0 -R docker -u yourdockeruser -o yourorg -p yourpassword - yourrepo -t latest"
-    exit 1
+  cat <<EOF
+Usage: $0 -R <registry> -u <user> -o <org> -p <password> -r <repo> [-t <tag>] [-s <sif_name>] [-d <DIR_BASE>] [-f]
+  -R, --registry <registry>   Registry to pull from ('docker' or 'ghcr'; defaults to 'ghcr')
+  -u, --user <user>           Username for GitHub or Docker (required)
+  -o, --org <org>             Organisation or user override (defaults to \$LOGIN_USER)
+  -p, --password <password>   Password or token (for GHCR defaults to GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT)
+  -r, --repo <repo>           Repository name (defaults to current directory basename)
+  -s, --sif <sif_name>        SIF filename (defaults to start with <repo>, appends -<branch>-<tag> if --no-append unused and tag set, and ends with .sif)
+  -n, --no-append             Do not append branch or tag to SIF name, if sif unspecified
+  -t, --tag <tag>             Tag (defaults to 'latest')
+  -d, --directory <dir>       Directory for storing the SIF (defaults to first cache dir)
+  -f, --force                 Force download & overwrite existing SIF
+EOF
+  exit 1
 }
 
-# Initialize default values
-TAG="latest"
-TAG_SET="false"
+# Defaults
+SIF_NAME=""
+branch="$(apptainer_common_get_branch | tr '[:upper:]' '[:lower:]')"
+BRANCH="-$branch"
+NO_APPEND=false
+TAG="latest";
+TAG_SET=false
 FORCE=false
-BASE_DIR=""
+DIR_BASE=""
 REGISTRY="ghcr"
 ORG=""
-REPO=$(basename $(pwd))
+REPO="$(basename "$PWD")"
 LOGIN_USER=""
+PASSWORD=""
 
-# Parse named parameters
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -R|--registry) REGISTRY="$2"; shift ;;
-        -u|--user) LOGIN_USER="$2"; shift ;;
-        -o|--org) ORG="$2"; shift ;;
-        -p|--password) PASSWORD="$2"; shift ;;
-        -r|--repo) REPO="$2"; shift ;;
-        -t|--tag) TAG="$2"; TAG_SET="true"; shift ;;
-        -s|--sif) SIF_NAME="$2"; shift ;;
-        -b|--base_dir) BASE_DIR="$2"; shift ;;
-        -f|--force) FORCE=true ;;
-        -h|--help) usage ;;
-        *) usage ;;
-    esac
-    shift
+# 1) Parse flags
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -R|--registry)    REGISTRY="$2"; shift 2 ;;
+    -u|--user)        LOGIN_USER="$2"; shift 2 ;;
+    -o|--org)         ORG="$2";       shift 2 ;;
+    -p|--password)    PASSWORD="$2";  shift 2 ;;
+    -r|--repo)        REPO="$2";      shift 2 ;;
+    -s|--sif)         SIF_NAME="$2";  shift 2 ;;
+    -t|--tag)         TAG="$2"; TAG_SET=true; shift 2 ;;
+    -n|--no-append)   NO_APPEND=true; shift ;;
+    -d|--directory)   DIR_BASE="$2";  shift 2 ;;
+    -f|--force)       FORCE=true;     shift ;;
+    -h|--help)        usage ;;
+    *)                usage ;;
+  esac
 done
 
-# Check mandatory parameters
-if [ -z "$LOGIN_USER" ] && [ -z "$ORG" ]; then
-    echo "Error: Either --user or --org must be specified."
-    usage
-    exit 1
+# 2) Validate mandatory
+if [[ -z "$LOGIN_USER" && -z "$ORG" ]]; then
+  echo "Error: either --user or --org must be specified." >&2
+  usage
+  exit 1
 fi
 
-# Set default values if not provided
+# 3) Compute default SIF_NAME if needed
 if [ -z "$SIF_NAME" ]; then
-    if [ "$TAG_SET" == "true" ]; then
-        SIF_NAME="${REPO,,}-${TAG,,}.sif"
-    else
+    if [ "$NO_APPEND" = true ]; then
         SIF_NAME="${REPO,,}.sif"
+    else
+        if [ "$TAG_SET" == "true" ]; then
+            SIF_NAME="${REPO,,}-${BRANCH}-${TAG,,}.sif"
+        else
+            SIF_NAME="${REPO,,}-${BRANCH}.sif"
+        fi
     fi
     SIF_NAME=$(echo "$SIF_NAME" | tr -d '[:space:]')
 fi
 
-# Determine the base directory if not provided
-if [ -z "$BASE_DIR" ]; then
-    if [ -n "$APPTAINER_CACHE_DIR" ]; then
-        BASE_DIR="$APPTAINER_CACHE_DIR"
-    elif [ -d "/scratch/$USER" ]; then
-        BASE_DIR="/scratch/$USER/.local/share/apptainer/sif"
-    else
-        BASE_DIR="$HOME/.local/share/apptainer/sif"
-    fi
+# 4) Check if the SIF already exists anywhere
+# Build the args for apptainer-exists:
+exists_args=( -s "$SIF_NAME" )
+if [[ -n "$DIR_BASE" ]]; then
+  exists_args+=( -d "$DIR_BASE" )
 fi
 
+# Now call it. On success it prints “Found: /path/to/xyz.sif”
+if found_line=$(apptainer-exists "${exists_args[@]}"); then
+  # extract just the path
+  existing_path=${found_line#Found: }
+  echo "⇒ SIF already present at: $existing_path"
+  if ! $FORCE; then
+    echo "Use --force if you really want to re-pull."
+    exit 0
+  else
+    echo "Overwriting because --force was specified."
+  fi
+fi
+
+# 5) Decide where to put the new SIF
+#
+if [[ -n "$DIR_BASE" ]]; then
+  target_dir="$DIR_BASE"
+else
+  mapfile -t base_dirs < <(apptainer_common_get_cache_dirs)
+  target_dir="${base_dirs[0]}"
+fi
+mkdir -p "$target_dir/logs/$REPO"
+SIF_FILE="$target_dir/$SIF_NAME"
+
 # Create the base directory and log directory if they don't exist
-LOG_DIR="$BASE_DIR/logs/$REPO"
+LOG_DIR="$DIR_BASE/logs/$REPO"
 mkdir -p "$LOG_DIR"
 
 # Full path for the SIF file
-SIF_FILE="$BASE_DIR/${SIF_NAME,,}"
+SIF_FILE="$DIR_BASE/${SIF_NAME,,}"
 
-# Set up log file with date and time
-LOG_FILE="$LOG_DIR/build_log_$(date '+%Y%m%d_%H%M%S').txt"
+# --- echo out all the options used ---
+echo "Options:"
+echo "  Registry:     $REGISTRY"
+echo "  User:         $LOGIN_USER"
+echo "  Organisation: ${ORG:-$LOGIN_USER}"
+echo "  Repository:   $REPO"
+echo "  Tag:          $TAG"
+echo "  SIF Name:     $SIF_NAME"
+echo "  Directory:    ${DIR_BASE:-<default cache dir>}"
+echo "  Force:        $FORCE"
+echo "  Target SIF:   $SIF_FILE"
+echo
 
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
-}
-# echo out all the options used
-log "Options:"
-log "  Registry: $REGISTRY"
-log "  User: $LOGIN_USER"
-log "  Organisation: ${ORG:-$LOGIN_USER}"
-log "  Repository: $REPO"
-log "  Password: ***"
-log "  Tag: $TAG"
-log "  SIF Name: $SIF_NAME"
-log "  Base Directory: $BASE_DIR"
-log "  Force: $FORCE"
-log "  SIF File: $SIF_FILE"
-
-# Function to handle errors and log the location of the log file
+# --- simple error handler ---
 error_handler() {
-    local err_msg="An error occurred during the script execution. See the log file for details: $LOG_FILE"
-    log "$err_msg"
-    echo "$err_msg"
-    echo "To view the log file, run:"
-    echo "cat $LOG_FILE"
+    echo "Error: something went wrong during script execution." >&2
     exit 1
 }
-
-# Trap errors to run the error handler
 trap 'error_handler' ERR
 
-# Check if SIF file already exists
-if [ -f "$SIF_FILE" ] && [ "$FORCE" = false ]; then
-    log "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite."
-    echo "To view the log file, run:"
-    echo "cat $LOG_FILE"
+# --- bail if SIF already exists and we're not forcing ---
+if [[ -f "$SIF_FILE" && "$FORCE" != true ]]; then
+    echo "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite." >&2
     exit 1
 fi
 
-# Set the registry hostname based on the chosen registry
-if [ "$REGISTRY" = "docker" ]; then
+# --- choose registry hostname ---
+if [[ "$REGISTRY" == "docker" ]]; then
     REGISTRY_HOSTNAME="docker.io"
-elif [ "$REGISTRY" = "ghcr" ]; then
+elif [[ "$REGISTRY" == "ghcr" ]]; then
     REGISTRY_HOSTNAME="ghcr.io"
 else
-    log "Error: Unsupported registry '$REGISTRY'"
+    echo "Error: Unsupported registry '$REGISTRY'" >&2
     exit 1
 fi
 
-# Set the password (GH_TOKEN) if not provided and GHCR is used
-if [ "$REGISTRY" = "ghcr" ] && [ -z "$PASSWORD" ]; then
-    PASSWORD="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT}}}"
+# --- pick up GHCR token if needed ---
+if [[ "$REGISTRY" == "ghcr" && -z "$PASSWORD" ]]; then
+    PASSWORD="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
 fi
 
-# Log in to the registry if credentials are provided
-if [ -n "$PASSWORD" ] && [ -n "$LOGIN_USER" ]; then
-    log "Logging into $REGISTRY"
-    echo "$PASSWORD" | apptainer registry login -u "$LOGIN_USER" --password-stdin "docker://$REGISTRY_HOSTNAME"
+# --- login if we have creds ---
+if [[ -n "$PASSWORD" && -n "$LOGIN_USER" ]]; then
+    echo "Logging into $REGISTRY_HOSTNAME as $LOGIN_USER"
+    echo "$PASSWORD" \
+      | apptainer registry login -u "$LOGIN_USER" --password-stdin \
+        "docker://$REGISTRY_HOSTNAME"
 else
-    log "Password and/or user not provided, skipping login for $REGISTRY"
+    echo "Skipping registry login (no credentials provided)"
 fi
 
 # Function to build Apptainer image
 build_apptainer() {
-    local organisation="${ORG:-$LOGIN_USER}"
-    organisation="${organisation,,}"
+    local org="${ORG:-$LOGIN_USER}"
+    org="${org,,}"
     local repo="${REPO,,}"
-    local image_uri="docker://${REGISTRY_HOSTNAME}/${organisation}/${repo}:${TAG}"
+    local uri="docker://${REGISTRY_HOSTNAME}/${org}/${repo}:${TAG}"
 
-    log "Building Apptainer image '$SIF_FILE' from Docker image '$image_uri'"
+    echo "Building Apptainer image '$SIF_FILE' from Docker image '$uri'"
 
-    if [ "$FORCE" = true ]; then
-        apptainer build --force "$SIF_FILE" "$image_uri"
+    if [[ "$FORCE" == true ]]; then
+        apptainer build --force "$SIF_FILE" "$uri"
     else
-        apptainer build "$SIF_FILE" "$image_uri"
+        apptainer build "$SIF_FILE" "$uri"
     fi
 
-    log "Apptainer build process completed"
+    echo "Apptainer build process completed for '$SIF_FILE'"
 }
-
 
 # Run the build function
 build_apptainer
 
-log "Apptainer image '$SIF_FILE' created successfully"
+echo "Apptainer image '$SIF_FILE' created successfully"

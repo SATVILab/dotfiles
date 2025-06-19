@@ -1,6 +1,6 @@
-# Dotfiles Repository for HPC and GitHub Codespaces
+# Dotfiles Repository for Linux Development Environments
 
-This repository provides a comprehensive setup for configuring development environments both on High-Performance Computing (HPC) clusters and GitHub Codespaces. It includes essential scripts and configurations that streamline your workflow, from setting up your environment to updating your dotfiles.
+This repository provides a comprehensive setup for configuring Linux development environments on High-Performance Computing (HPC) clusters, Windows Subsystem for Linux (WSL), Linux operating systems and development containers (in WSL and in GitHub Codespaces).
 
 ## TL;DR
 
