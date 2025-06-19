@@ -35,7 +35,7 @@ parse_args() {
     *) echo "Error: invalid environment '$dotfiles_env'." >&2; usage ;;
   esac
   if [[ "$dotfiles_env" == "codespaces" ]]; then
-    env="codespace"
+    dotfiles_env="codespace"
   fi
 }
 
@@ -142,13 +142,15 @@ copy_bashrc_fragments() {
   shopt -u nullglob
 }
 
-
 # -----------------------------------------------------------------------------
 # Prompt to inject GitHub & HuggingFace creds into login.sh
 # -----------------------------------------------------------------------------
 configure_login() {
   local login_file="$HOME/.bashrc.d/login.sh"
   [[ -f "$login_file" ]] || return
+  if [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]; then
+    return
+  fi
 
   echo
   echo "Configure GitHub & Hugging Face credentials in login.sh (leave blank to skip):"
@@ -176,10 +178,9 @@ configure_login() {
 # Copy hidden config files, sanitising .Renviron for wsl/dev
 # -----------------------------------------------------------------------------
 copy_hidden_configs_r() {
-  
   echo "Copying hidden config files…"
 
-  # If in dev or codespaces, and R not available, skip copying R configs
+  # If in dev or codespace, and R not available, skip copying R configs
   if [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]; then
     if ! command -v R &> /dev/null; then
       echo "R not found, skipping all R config files in $dotfiles_env environment."
@@ -206,36 +207,43 @@ copy_hidden_configs_r() {
         action="copy"
       fi
 
-      while true; do
-        read -p "Do you want to $action $file (likely say yes if unsure)? [y/n] " yn
-        case "${yn,,}" in
-          y|yes)
-            # .Renviron by default specifies the /scratch directory,
-            # which is HPC-specific.
-            if [[ "$file" == ".Renviron" && "$dotfiles_env" != "hpc" ]]; then
-              sed -E \
-                '/^(RENV_PATHS_LIBRARY_ROOT|RENV_PATHS_CACHE|RENV_PATHS_ROOT|R_LIBS)=/d' \
-                "$src" > "$dest"
-              echo "  Sanitised and copied $file"
-            else
-              cp "$src" "$dest"
-              echo "  Copied $file"
-            fi
-            break
-            ;;
-          n|no)
-            echo "  Skipped $file"
-            break
-            ;;
-          *)
-            echo "  Please answer y or n."
-            ;;
-        esac
-      done
+      if auto_approve; then
+        yn="y"
+      else
+        while true; do
+          read -p "Do you want to $action $file (likely say yes if unsure)? [y/n] " yn
+          case "${yn,,}" in
+            y|yes|n|no) break ;;
+            *) echo "  Please answer y or n." ;;
+          esac
+        done
+      fi
+
+      if [[ "${yn,,}" == "y" || "${yn,,}" == "yes" ]]; then
+        # .Renviron special handling
+        if [[ "$file" == ".Renviron" && "$dotfiles_env" != "hpc" ]]; then
+          sed -E \
+            '/^(RENV_PATHS_LIBRARY_ROOT|RENV_PATHS_CACHE|RENV_PATHS_ROOT|R_LIBS)=/d' \
+            "$src" > "$dest"
+          echo "  Sanitised and copied $file"
+        else
+          cp "$src" "$dest"
+          echo "  Copied $file"
+        fi
+      else
+        echo "  Skipped $file"
+      fi
     else
       echo "  $file is up to date."
     fi
   done
+}
+
+
+auto_approve() {
+  # automatically copy config across for devcontainers 
+  # (either in codespaces or otherwise e.g. wsl)
+  [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]
 }
 
 # -----------------------------------------------------------------------------
@@ -248,13 +256,6 @@ configure_git() {
   name=$(git config --global user.name || echo "")
   email=$(git config --global user.email || echo "")
 
-  prompt_for() {
-    local prompt_text="$1" varname="$2" default="$3"
-    read -p "$prompt_text" answer
-    answer=${answer:-$default}
-    [[ -n "$answer" ]] && git config --global "$varname" "$answer"
-  }
-
   # Choose default email domain by environment
   case "$dotfiles_env" in
     hpc)       def_email="$USER@hpc.auto" ;;
@@ -264,9 +265,23 @@ configure_git() {
     linux|*)   def_email="$USER@linux.local" ;;
   esac
 
-  [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$USER"
-  [[ -z "$email" ]] && prompt_for "Enter Git user.email: " "user.email" "$def_email"
+  if auto_approve; then
+    # Use sensible defaults without prompting
+    [[ -z "$name" ]]  && git config --global user.name  "$USER"
+    [[ -z "$email" ]] && git config --global user.email "$def_email"
+  else
+    prompt_for() {
+      local prompt_text="$1" varname="$2" default="$3"
+      read -p "$prompt_text" answer
+      answer=${answer:-$default}
+      [[ -n "$answer" ]] && git config --global "$varname" "$answer"
+    }
+
+    [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$USER"
+    [[ -z "$email" ]] && prompt_for "Enter Git user.email: " "user.email" "$def_email"
+  fi
 }
+
 
 # -----------------------------------------------------------------------------
 # Print final success message
@@ -284,7 +299,6 @@ print_completion() {
 # -----------------------------------------------------------------------------
 # Unset the dotfiles_env variable to avoid conflicts
 # -----------------------------------------------------------------------------
-
 unset_dotfiles_env() {
   unset dotfiles_env
 }
