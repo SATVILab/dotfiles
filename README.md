@@ -14,10 +14,6 @@ Its primary purpose is to configure Git and/or HuggingFace authentication and co
 
 ## Quick Start
 
-### GitHub Codespaces
-
-Set this repository as your dotfiles in the Codespaces settings. It will automatically install when you create a new codespace.
-
 ### Local Installation
 
 Clone and install for your environment:
@@ -36,6 +32,10 @@ Where `<env>` is one of:
 * `dev` (for generic devcontainer)
 * `codespace` (for GitHub Codespaces; installs automatically if set as dotfiles repo)
 * `mac` (for Mac; untested)
+
+### GitHub Codespaces
+
+Set this repository as your dotfiles in the Codespaces settings. It will automatically install when you create a new codespace.
 
 ---
 
