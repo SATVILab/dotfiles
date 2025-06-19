@@ -44,7 +44,12 @@ export_if_set() {
 export_if_set "GITHUB_USERNAME" "$GITHUB_USERNAME"
 export_if_set "GITHUB_USER" "$GITHUB_USERNAME"
 
-# Export GitHub Token and related variables
+# Export GitHub Token and related variables.
+# GH_TOKEN takes precedence if set,
+# as we have then manually added it
+# and so we want to ensure it is used.
+# GITHUB_TOKEN is automatically added by e.g.
+# GH cli and often has too few permissions.
 export_if_set "GH_TOKEN" "$GH_TOKEN"
 export_if_set "GITHUB_TOKEN" "$GH_TOKEN"
 export_if_set "GITHUB_PAT" "$GH_TOKEN"

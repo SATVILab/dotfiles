@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-env.sh — unified installer for hpc, wsl, dev
+# install-env.sh — unified installer for hpc, wsl, dev, linux
 
 set -euo pipefail
 
@@ -11,14 +11,18 @@ usage() {
 Usage: $0 <env>
 
 <env> must be one of:
-  hpc    – HPC setup
-  wsl    – WSL setup
-  dev    – Devcontainer (WSL) setup
+  hpc       - HPC setup
+  linux     - Linux setup (not in a container)
+  wsl       - WSL setup (not in a container)
+  dev       - Devcontainer setup inside Linux/WSL
+  codespace - Devcontainer setup inside Codespace setup)
 
 Example:
   $0 hpc
+  $0 linux
   $0 wsl
   $0 dev
+  $0 codespace
 EOF
   exit 1
 }
@@ -27,9 +31,12 @@ parse_args() {
   [[ $# -eq 1 ]] || usage
   env="$1"
   case "$env" in
-    hpc|wsl|dev) ;;
+    hpc|linux|wsl|dev|codespace|codespaces) ;;
     *) echo "Error: invalid environment '$env'." >&2; usage ;;
   esac
+  if [[ "$env" == "codespaces" ]]; then
+    env="codespace"
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -68,6 +75,7 @@ normalize_dotfiles() {
 # -----------------------------------------------------------------------------
 copy_scripts() {
   echo "Copying scripts to ~/.local/bin…"
+  shopt -s nullglob
   for script in "$HOME/dotfiles/scripts/"*; do
     name=$(basename "$script")
     case "$env" in
@@ -76,13 +84,22 @@ copy_scripts() {
       wsl)
         [[ "$name" == slurm* ]] && { echo "  Skipping $name"; continue; }
         cp "$script" "$HOME/.local/bin/" ;;
+      linux)
+        [[ "$name" == slurm* ]] && { echo "  Skipping $name"; continue; }
+        cp "$script" "$HOME/.local/bin/" ;;
       dev)
+        if [[ "$name" == slurm* || "$name" == apptainer-* ]]; then
+          echo "  Skipping $name"; continue
+        fi
+        cp "$script" "$HOME/.local/bin/" ;;
+      codespace)
         if [[ "$name" == slurm* || "$name" == apptainer-* ]]; then
           echo "  Skipping $name"; continue
         fi
         cp "$script" "$HOME/.local/bin/" ;;
     esac
   done
+  shopt -s nullglob
 }
 
 # -----------------------------------------------------------------------------
@@ -90,23 +107,35 @@ copy_scripts() {
 # -----------------------------------------------------------------------------
 copy_bashrc_fragments() {
   echo "Copying bashrc.d fragments…"
+  shopt -s nullglob
   for file in "$HOME/dotfiles/bashrc.d/"*; do
     filename=$(basename "$file")
 
     # skip HPC-only fragments in non-hpc envs
-    [[ "$env" != hpc && "$filename" == hpc-* ]] && {
-      echo "  Skipping $filename (HPC-specific)"; continue
-    }
+    if [[ "$env" != hpc && "$filename" == hpc-* ]]; then
+      echo "  Skipping $filename (HPC-specific)"
+      continue
+    fi
 
     # preserve existing login.sh, but still configure if newly copied
     if [[ "$filename" == login.sh && -e "$HOME/.bashrc.d/$filename" ]]; then
       echo "  Skipping $filename (already exists)"
-    else
+    else 
       cp "$file" "$HOME/.bashrc.d/"
-      [[ "$filename" == login.sh ]] && configure_login
+      # don't need to do manually add creds in a codespace,
+      # as these can be injected by codespace secrets.
+      # but we still want to export GITHUB_PAT as GH_TOKEN,
+      # for example, if it's not yet set, so we didn't
+      # skip the copy step above.
+      if [[ "$filename" == login.sh && "$env" != codespace ]]; then
+        echo "  Configuring $filename"
+        configure_login
+      fi
     fi
   done
+  shopt -s nullglob
 }
+
 
 # -----------------------------------------------------------------------------
 # Prompt to inject GitHub & HuggingFace creds into login.sh
@@ -140,9 +169,18 @@ configure_login() {
 # -----------------------------------------------------------------------------
 # Copy hidden config files, sanitising .Renviron for wsl/dev
 # -----------------------------------------------------------------------------
-copy_hidden_configs() {
+copy_hidden_configs_r() {
   local files=( .Renviron .lintr .radian_profile )
   echo "Copying hidden config files…"
+
+  # If in dev or codespaces, and R not available, skip copying R configs
+  if [[ "$env" == "dev" || "$env" == "codespace" ]]; then
+    if ! command -v R &> /dev/null; then
+      echo "R not found, skipping all R config files in $env environment."
+      return
+    fi
+  fi
+
 
   for file in "${files[@]}"; do
     local src="$HOME/dotfiles/$file" dest="$HOME/$file"
@@ -160,10 +198,12 @@ copy_hidden_configs() {
       fi
 
       while true; do
-        read -p "Do you want to $action $file? [y/n] " yn
+        read -p "Do you want to $action $file (likely say yes if unsure)? [y/n] " yn
         case "${yn,,}" in
           y|yes)
-            if [[ "$file" == .Renviron && ( "$env" == wsl || "$env" == dev ) ]]; then
+            # .Renviron by default specifies the /scratch directory,
+            # which is HPC-specific.
+            if [[ "$file" == ".Renviron" && "$env" != "hpc" ]]; then
               sed -E \
                 '/^(RENV_PATHS_LIBRARY_ROOT|RENV_PATHS_CACHE|RENV_PATHS_ROOT|R_LIBS)=/d' \
                 "$src" > "$dest"
@@ -193,7 +233,7 @@ copy_hidden_configs() {
 # Prompt to set up Git user.name & user.email if missing
 # -----------------------------------------------------------------------------
 configure_git() {
-  local name email
+  local name email def_email
 
   name=$(git config --global user.name || echo "")
   email=$(git config --global user.email || echo "")
@@ -205,32 +245,17 @@ configure_git() {
     [[ -n "$answer" ]] && git config --global "$varname" "$answer"
   }
 
-  [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$USER"
-  [[ -z "$email" ]] && {
-    local def_email="$USER@${env=hpc? "hpc.auto":"wsl.local"}"
-    prompt_for "Enter Git user.email: " "user.email" "$def_email"
-  }
-}
-
-# -----------------------------------------------------------------------------
-# Commit any chmod/dos2unix changes back to the dotfiles repo
-# -----------------------------------------------------------------------------
-commit_repo_changes() {
-  local msg
+  # Choose default email domain by environment
   case "$env" in
-    hpc) msg="Ensure Unix line endings & executability (HPC)" ;;
-    wsl) msg="Sanitise .Renviron & executability (WSL)" ;;
-    dev) msg="Sanitise .Renviron & executability (Devcontainer)" ;;
+    hpc)       def_email="$USER@hpc.auto" ;;
+    wsl)       def_email="$USER@wsl.local" ;;
+    dev)       def_email="$USER@dev.local" ;;
+    codespace) def_email="$USER@codespace.local" ;;
+    linux|*)   def_email="$USER@linux.local" ;;
   esac
 
-  cd "$HOME/dotfiles"
-  if ! git diff --quiet bashrc.d/ scripts/; then
-    git add bashrc.d/* scripts/*
-    git commit -m "$msg"
-    git push
-  else
-    echo "No changes in bashrc.d or scripts to commit."
-  fi
+  [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$USER"
+  [[ -z "$email" ]] && prompt_for "Enter Git user.email: " "user.email" "$def_email"
 }
 
 # -----------------------------------------------------------------------------
@@ -238,9 +263,11 @@ commit_repo_changes() {
 # -----------------------------------------------------------------------------
 print_completion() {
   case "$env" in
-    hpc)   echo "HPC setup complete." ;;
-    wsl)   echo "WSL setup complete." ;;
-    dev)   echo "Devcontainer setup complete." ;;
+    hpc)    echo "HPC setup complete." ;;
+    linux)  echo "Linux setup complete." ;;
+    wsl)    echo "WSL setup complete." ;;
+    dev)    echo "Devcontainer setup complete." ;;
+    codespace) echo "Codespace setup complete." ;;
   esac
 }
 
@@ -254,9 +281,8 @@ main() {
   normalize_dotfiles
   copy_scripts
   copy_bashrc_fragments
-  copy_hidden_configs
+  copy_hidden_configs_r
   configure_git
-  commit_repo_changes
   print_completion
 }
 
