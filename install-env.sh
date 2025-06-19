@@ -247,7 +247,6 @@ copy_hidden_configs_r() {
   local dotfiles_dir dest_dir
   dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  # In the future, you could set a different dest_dir for Mac if you wanted
   dest_dir="$HOME"
 
   for file in "${files[@]}"; do
