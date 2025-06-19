@@ -253,9 +253,9 @@ configure_git() {
   git config --global core.autocrlf input
   local name email def_email username
 
-  name=$(git config --global user.name || echo "")
-  email=$(git config --global user.email || echo "")
-  username="${USER:-$(id -un)}"
+  name="$(git config --global user.name || git config --system user.name || echo "")"
+  email="$(git config --global user.email || git config --system user.email || echo "")"
+  username="${GITHUB_USER:-${USER:-$(id -un)}}"
 
   # Choose default email domain by environment
   case "$dotfiles_env" in
