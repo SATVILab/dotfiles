@@ -251,23 +251,24 @@ auto_approve() {
 # -----------------------------------------------------------------------------
 configure_git() {
   git config --global core.autocrlf input
-  local name email def_email
+  local name email def_email username
 
   name=$(git config --global user.name || echo "")
   email=$(git config --global user.email || echo "")
+  username="${USER:-$(id -un)}"
 
   # Choose default email domain by environment
   case "$dotfiles_env" in
-    hpc)       def_email="$USER@hpc.auto" ;;
-    wsl)       def_email="$USER@wsl.local" ;;
-    dev)       def_email="$USER@dev.local" ;;
-    codespace) def_email="$USER@codespace.local" ;;
-    linux|*)   def_email="$USER@linux.local" ;;
+    hpc)       def_email="$username@hpc.auto" ;;
+    wsl)       def_email="$username@wsl.local" ;;
+    dev)       def_email="$username@dev.local" ;;
+    codespace) def_email="$username@codespace.local" ;;
+    linux|*)   def_email="$username@linux.local" ;;
   esac
 
   if auto_approve; then
     # Use sensible defaults without prompting
-    [[ -z "$name" ]]  && git config --global user.name  "$USER"
+    [[ -z "$name" ]]  && git config --global user.name  "$username"
     [[ -z "$email" ]] && git config --global user.email "$def_email"
   else
     prompt_for() {
@@ -277,7 +278,7 @@ configure_git() {
       [[ -n "$answer" ]] && git config --global "$varname" "$answer"
     }
 
-    [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$USER"
+    [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$username"
     [[ -z "$email" ]] && prompt_for "Enter Git user.email: " "user.email" "$def_email"
   fi
 }
