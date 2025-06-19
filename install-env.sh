@@ -243,7 +243,7 @@ copy_hidden_configs_r() {
 auto_approve() {
   # automatically copy config across for devcontainers 
   # (either in codespaces or otherwise e.g. wsl)
-  [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]
+  [[ "$dotfiles_env" == "dev" ]]
 }
 
 # -----------------------------------------------------------------------------
