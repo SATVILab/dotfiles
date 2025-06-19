@@ -25,7 +25,7 @@ Clone and install for your environment:
 ```bash
 git clone https://github.com/YourUsername/dotfiles.git ~/dotfiles
 cd ~/dotfiles
-bash install-env.sh <env>
+./install-env.sh <env>
 ```
 
 Where `<env>` is one of:
