@@ -28,6 +28,7 @@ EOF
 }
 
 parse_args() {
+  echo "Parsing arguments…"
   [[ $# -eq 1 ]] || usage
   dotfiles_env="$1"
   case "$dotfiles_env" in
@@ -37,12 +38,14 @@ parse_args() {
   if [[ "$dotfiles_env" == "codespaces" ]]; then
     dotfiles_env="codespace"
   fi
+  echo "Arguments parsed successfully. Environment set to '$dotfiles_env'."
 }
 
 # -----------------------------------------------------------------------------
 # Ensure ~/.bashrc will source ~/.bashrc.d/*.sh fragments
 # -----------------------------------------------------------------------------
 ensure_bashrc_sourcing() {
+  echo "Ensuring ~/.bashrc sources ~/.bashrc.d/*.sh fragments…"
   local rc="$HOME/.bashrc"
   [[ -e "$rc" ]] || touch "$rc"
 
@@ -50,6 +53,7 @@ ensure_bashrc_sourcing() {
     echo 'for i in $HOME/.bashrc.d/*; do [ -r "$i" ] && source "$i"; done' >> "$rc"
     echo "Added .bashrc.d sourcing to $rc"
   fi
+  echo "~/.bashrc is set up to source ~/.bashrc.d/*.sh fragments."
 }
 
 # -----------------------------------------------------------------------------
@@ -70,6 +74,7 @@ normalize_dotfiles() {
     find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec dos2unix {} +
   fi
   find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec chmod +x {} +
+  echo "Normalization complete."
 }
 
 # -----------------------------------------------------------------------------
@@ -104,6 +109,7 @@ copy_scripts() {
     esac
   done
   shopt -u nullglob
+  echo "Scripts copied to ~/.local/bin."
 }
 
 # -----------------------------------------------------------------------------
@@ -140,12 +146,14 @@ copy_bashrc_fragments() {
     fi
   done
   shopt -u nullglob
+  echo "bashrc.d fragments copied."
 }
 
 # -----------------------------------------------------------------------------
 # Prompt to inject GitHub & HuggingFace creds into login.sh
 # -----------------------------------------------------------------------------
 configure_login() {
+  echo "Configuring GitHub & Hugging Face credentials in login.sh…"
   local login_file="$HOME/.bashrc.d/login.sh"
   [[ -f "$login_file" ]] || return
   if [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]; then
@@ -208,6 +216,7 @@ copy_hidden_configs_r() {
       fi
 
       if auto_approve; then
+        echo "Auto-approving $action of $file"
         yn="y"
       else
         while true; do
@@ -237,19 +246,22 @@ copy_hidden_configs_r() {
       echo "  $file is up to date."
     fi
   done
+  echo "Hidden config files copied."
 }
 
 
 auto_approve() {
-  # automatically copy config across for devcontainers 
-  # (either in codespaces or otherwise e.g. wsl)
-  [[ "$dotfiles_env" == "dev" ]]
+  # automatically copy config across for codespaces, 
+  # as prompting is not possible in the codespace setup.
+  [[ "$dotfiles_env" == "codespace" ]]
 }
 
 # -----------------------------------------------------------------------------
 # Prompt to set up Git user.name & user.email if missing
 # -----------------------------------------------------------------------------
 configure_git() {
+  echo "Configuring Git line endings, user.name and user.email…"
+  echo "Setting Git core.autocrlf to 'input' for better cross-platform compatibility."
   git config --global core.autocrlf input
   local name email def_email username
 
@@ -267,10 +279,12 @@ configure_git() {
   esac
 
   if auto_approve; then
+    echo "Auto-approving Git user configuration if unset"
     # Use sensible defaults without prompting
     [[ -z "$name" ]]  && git config --global user.name  "$username"
     [[ -z "$email" ]] && git config --global user.email "$def_email"
   else
+    echo "Prompting for Git user configuration if unset"
     prompt_for() {
       local prompt_text="$1" varname="$2" default="$3"
       read -p "$prompt_text" answer
@@ -281,6 +295,7 @@ configure_git() {
     [[ -z "$name" ]]  && prompt_for "Enter Git user.name: "  "user.name"  "$username"
     [[ -z "$email" ]] && prompt_for "Enter Git user.email: " "user.email" "$def_email"
   fi
+  echo "Git configuration complete."
 }
 
 
