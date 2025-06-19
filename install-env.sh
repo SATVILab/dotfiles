@@ -242,6 +242,7 @@ copy_hidden_configs_r() {
 # Prompt to set up Git user.name & user.email if missing
 # -----------------------------------------------------------------------------
 configure_git() {
+  git config --global core.autocrlf input
   local name email def_email
 
   name=$(git config --global user.name || echo "")
