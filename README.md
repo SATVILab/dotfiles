@@ -19,9 +19,8 @@ Its primary purpose is to configure Git and/or HuggingFace authentication and co
 Clone and install for your environment:
 
 ```bash
-git clone https://github.com/YourUsername/dotfiles.git ~/dotfiles
-cd ~/dotfiles
-./install-env.sh <env>
+git clone https://github.com/SATVILab/dotfiles.git "$HOME"/dotfiles
+"$HOME"/dotfiles/install-env.sh <env>
 ```
 
 Where `<env>` is one of:
@@ -72,6 +71,13 @@ If in a GitHub codespace, you should rebuild the codespace (full rebuild not nee
 
 * Native Windows is not supported—use WSL.
 * macOS support is present but untested.
+
+---
+
+## Forking
+
+To use this as a base for your own dotfiles, fork this repository and modify the scripts as needed.
+Feel free to contribute improvements back to the main repository.
 
 ---
 
