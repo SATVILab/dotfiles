@@ -1,119 +1,86 @@
-# Dotfiles Repository for Linux Development Environments
+# Dotfiles: Unified Shell Environment for HPC, Linux, WSL, Codespaces, & Mac
 
-This repository provides a comprehensive setup for configuring Linux development environments on High-Performance Computing (HPC) clusters, Windows Subsystem for Linux (WSL), Linux operating systems and development containers (in WSL and in GitHub Codespaces).
+This repo provides an installable, cross-platform dotfiles environment supporting:
 
-## TL;DR
+* **HPC clusters** (Bash)
+* **Linux** (Bash)
+* **WSL** (Bash)
+* **Devcontainers & GitHub Codespaces** (auto-installs)
+* **macOS** (Zsh/Bash; support untested)
 
-- **HPC Users**: Clone the repo and run `install-hpc.sh` to set up your environment.
-- **Codespaces Users**: Use this repository as your dotfiles repository in your Codespaces settings.
-- **Update Dotfiles**: Use `hpc-dotfiles-update` on HPC to keep your setup current.
-- **Explore Commands**: Use the `-h` option with most scripts to see detailed help.
-
-## Table of Contents
-
-1. [Summary](#summary)
-2. [Setup on HPC](#setup-on-hpc)
-3. [Update Dotfiles on HPC](#update-dotfiles-on-hpc)
-4. [Usage on GitHub Codespaces](#usage-on-github-codespaces)
-5. [Detailed Script Overview](#detailed-script-overview)
-    - [Apptainer Scripts](#apptainer-scripts)
-    - [Slurm Scripts](#slurm-scripts)
-    - [Utility Scripts](#utility-scripts)
-6. [Dotfiles Overview](#dotfiles-overview)
-7. [Additional Resources](#additional-resources)
+Its primary purpose is to configure Git and/or HuggingFace authentication and configure R within VS Code. 
 
 ---
 
-## Summary
+## Quick Start
 
-This repository contains scripts and configurations to enhance your development environment on both HPC clusters and GitHub Codespaces. The scripts automate common tasks such as container management with Apptainer, job submission with Slurm, and environment setup.
+### GitHub Codespaces
 
-## Setup on HPC
+Set this repository as your dotfiles in the Codespaces settings. It will automatically install when you create a new codespace.
 
-To set up your environment on an HPC cluster:
+### Local Installation
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/YourUsername/dotfiles.git ~/dotfiles
-   ```
-2. **Run the Installation Script**:
-   ```bash
-   bash ~/dotfiles/install-hpc.sh
-   ```
-   This script will:
-   - Copy all necessary scripts to your `~/.local/bin` directory.
-   - Configure your environment by sourcing scripts in `.bashrc.d`.
-   - Optionally copy hidden configuration files if the `-c` flag is set.
-
-3. **Copy Hidden Files** (optional):
-   To copy hidden configuration files, re-run the installation script with the `-c` flag:
-   ```bash
-   bash ~/dotfiles/install-hpc.sh -c
-   ```
-
-## Update Dotfiles on HPC
-
-To update your dotfiles on the HPC, run:
+Clone and install for your environment:
 
 ```bash
-hpc-dotfiles-update
+git clone https://github.com/YourUsername/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+bash install-env.sh <env>
 ```
 
-This will pull the latest changes from the repository and re-run the setup script.
+Where `<env>` is one of:
 
-## Usage on GitHub Codespaces
+* `hpc` (for clusters)
+* `linux` (for normal Linux)
+* `wsl` (for Windows Subsystem for Linux)
+* `dev` (for generic devcontainer)
+* `codespace` (for GitHub Codespaces; installs automatically if set as dotfiles repo)
+* `mac` (for Mac; untested)
 
-To use this dotfiles repository in GitHub Codespaces:
+---
 
-1. **Set the Repository as Your Dotfiles Repo**:
-   - Go to your GitHub account settings.
-   - Under "Codespaces", set this repository as your dotfiles repository.
+## What Does This Setup Provide?
 
-2. **Customize Your Environment**:
-   The `install.sh` script will automatically run in your Codespaces environment, setting up your development environment.
+* **Utility script installation:**
+  All repo scripts go to `~/.local/bin`, including:
+  * **Apptainer and Slurm tools** for HPC/cluster users
+  * **dotfiles-update** helper for keeping your setup current
+* **R config:**
+  Copies sensible `.Renviron`, `.lintr`, and `.radian_profile` defaults if using R/VS Code—also strips out HPC-specific R settings if not on cluster.
+* **Authentication environment:**
+  Prompts (when in interactive mode) to set up initial GitHub and HuggingFace authentication for use in scripts/RStudio/VS Code.
+* **Git configuration:**
+  Ensures email/username are set and normalises line endings for cross-platform safety.
 
-## Detailed Script Overview
+---
 
-### Apptainer Scripts
+## Updating Your Dotfiles
 
-- **`apptainer-exists`**: Checks if a specified Apptainer Image File (SIF) exists.
-- **`apptainer-pull`**: Pulls an Apptainer image from the GitHub Container Registry and saves it locally.
-- **`apptainer-run`**: Runs a command inside an Apptainer container.
-- **`apptainer-run-rscript`**: Runs an R script inside an Apptainer container.
-- **`apptainer-vscode`**: Installs and manages VS Code CLI for each Apptainer image.
+To update your setup after pulling changes:
 
-### Slurm Scripts
+```bash
+cd ~/dotfiles
+git pull
+bash install-env.sh <env>
+```
 
-- **`slurm-sbatch`**: Submits a job to Slurm, saving logs in a structured directory.
-- **`slurm-sintx`**: Submits a Slurm job with a specified number of tasks (default is 2).
-- **`slurm-squeue`**: Displays the Slurm queue for the current user.
+If in a GitHub codespace, you should rebuild the codespace (full rebuild not needed).
 
-### Utility Scripts
+---
 
-- **`hpc-dotfiles-update`**: Updates the dotfiles repository on the HPC and re-runs the setup.
-- **`install-jetbrains-font`**: Installs the JetBrains Mono font and configures it for use in VS Code.
-- **`install-vscode`**: Downloads and installs VS Code CLI, creating symbolic links for easy access.
+## Limitations
 
-## Dotfiles Overview
+* Native Windows is not supported—use WSL.
+* macOS support is present but untested.
 
-### `.Renviron`
+---
 
-- Contains environment variables for R projects.
+## Questions or issues?
 
-### `.gitconfig`
+Feel free to open an issue on the GitHub repository or contact me directly (Miguel Rodo at miguel.rodo@uct.ac.za).
 
-- Configures Git to handle line endings with `autocrlf=input`.
+## Resources
 
-### `.radian_profile`
-
-- Configures the Radian REPL, disabling auto-matching of parentheses.
-
-### `.lintr`
-
-- Configures `lintr` to disable specific linters for R code.
-
-## Additional Resources
-
-- [Dotfiles Guide](https://dotfiles.github.io/)
-- [Apptainer Documentation](https://apptainer.org/docs/)
-- [Slurm User Guide](https://slurm.schedmd.com/documentation.html)
+* [Dotfiles Guide](https://dotfiles.github.io/)
+* [Apptainer Docs](https://apptainer.org/docs/)
+* [Slurm Docs](https://slurm.schedmd.com/documentation.html)
