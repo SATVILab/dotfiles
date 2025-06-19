@@ -3,10 +3,11 @@
 # This script ensures that ~/bin and ~/.local/bin are included in the user's PATH.
 # It checks if these directories are in the PATH and adds them if they are not.
 
-if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
-    export PATH="$HOME/bin:$PATH"
-fi
+PATH="${PATH:-}"
 
-if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    export PATH="$HOME/.local/bin:$PATH"
-fi
+for dir in "$HOME/bin" "$HOME/.local/bin"; do
+  case ":$PATH:" in
+    *":$dir:"*) ;;
+    *) export PATH="$dir:$PATH" ;;
+  esac
+done

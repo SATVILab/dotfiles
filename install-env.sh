@@ -16,6 +16,7 @@ Usage: $0 <env>
   wsl       - WSL setup (not in a container)
   dev       - Devcontainer setup inside Linux/WSL
   codespace - Devcontainer setup inside Codespace setup)
+  mac       - MacOS setup
 
 Example:
   $0 hpc
@@ -23,6 +24,7 @@ Example:
   $0 wsl
   $0 dev
   $0 codespace
+  $0 mac
 EOF
   exit 1
 }
@@ -32,7 +34,7 @@ parse_args() {
   [[ $# -eq 1 ]] || usage
   dotfiles_env="$1"
   case "$dotfiles_env" in
-    hpc|linux|wsl|dev|codespace|codespaces) ;;
+    hpc|linux|wsl|dev|codespace|codespaces|mac) ;;
     *) echo "Error: invalid environment '$dotfiles_env'." >&2; usage ;;
   esac
   if [[ "$dotfiles_env" == "codespaces" ]]; then
@@ -44,38 +46,76 @@ parse_args() {
 # -----------------------------------------------------------------------------
 # Ensure ~/.bashrc will source ~/.bashrc.d/*.sh fragments
 # -----------------------------------------------------------------------------
-ensure_bashrc_sourcing() {
-  echo "Ensuring ~/.bashrc sources ~/.bashrc.d/*.sh fragments…"
-  local rc="$HOME/.bashrc"
-  [[ -e "$rc" ]] || touch "$rc"
+ensure_shell_rc_sourcing() {
+  echo "Ensuring shell rc files source fragment files…"
 
-  if ! grep -Fq '.bashrc.d' "$rc"; then
-    echo 'for i in $HOME/.bashrc.d/*; do [ -r "$i" ] && source "$i"; done' >> "$rc"
-    echo "Added .bashrc.d sourcing to $rc"
+  local rc fragment_dir fragment_line rc_type
+  fragment_dir="$(get_fragment_dir)"
+
+  if [[ "$dotfiles_env" == "mac" ]]; then
+    rc="$HOME/.zshrc"
+    fragment_line='for i in $HOME/.zshrc.d/*; do [ -r "$i" ] && source "$i"; done'
+    rc_type="~/.zshrc"
+  else
+    rc="$HOME/.bashrc"
+    fragment_line='for i in $HOME/.bashrc.d/*; do [ -r "$i" ] && source "$i"; done'
+    rc_type="~/.bashrc"
   fi
-  echo "~/.bashrc is set up to source ~/.bashrc.d/*.sh fragments."
+
+  [[ -e "$rc" ]] || touch "$rc"
+  mkdir -p "$fragment_dir"
+
+  if ! grep -Fq "$fragment_dir" "$rc"; then
+    echo "$fragment_line" >> "$rc"
+    echo "Added $fragment_dir sourcing to $rc"
+  fi
+
+  echo "$rc_type is set up to source $fragment_dir/* fragments."
 }
 
 # -----------------------------------------------------------------------------
 # Create required directories
 # -----------------------------------------------------------------------------
 prepare_directories() {
-  mkdir -p "$HOME/.bashrc.d" "$HOME/.local/bin"
+  mkdir -p "$(get_fragment_dir)" "$HOME/.local/bin"
+}
+
+get_fragment_dir() {
+  if [[ "$dotfiles_env" == "mac" ]]; then
+    echo "$HOME/.zshrc.d"
+  else
+    echo "$HOME/.bashrc.d"
+  fi
 }
 
 # -----------------------------------------------------------------------------
 # Convert CRLF→LF and chmod +x in dotfiles
 # -----------------------------------------------------------------------------
-normalize_dotfiles() {
+normalise_dotfiles() {
   echo "Normalising line endings and permissions in dotfiles…"
-  local dotfiles_dir
+  local dotfiles_dir fragment_dir
   dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if command -v dos2unix &>/dev/null; then
-    find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec dos2unix {} +
+  fragment_dir="$(get_fragment_dir)"
+
+  if [[ "$dotfiles_env" == "mac" ]]; then
+    echo "Skipping dos2unix on macOS, setting permissions only…"
+    find "$dotfiles_dir/scripts" "$fragment_dir" -type f -exec chmod +x {} +
+    echo "Permissions set on macOS."
+    return
   fi
-  find "$dotfiles_dir/scripts" "$dotfiles_dir/bashrc.d" -type f -exec chmod +x {} +
-  echo "Normalization complete."
+
+  if command -v dos2unix &>/dev/null; then
+    echo "Converting line endings to LF using dos2unix…"
+    find "$dotfiles_dir/scripts" "$fragment_dir" -type f -exec dos2unix {} +
+  else
+    echo "dos2unix not found, skipping line ending conversion."
+  fi
+
+  find "$dotfiles_dir/scripts" "$fragment_dir" -type f -exec chmod +x {} +
+  echo "Permissions set."
+  echo "Normalisation complete."
 }
+
 
 # -----------------------------------------------------------------------------
 # Copy scripts into ~/.local/bin, skipping per-env patterns
@@ -96,7 +136,7 @@ copy_scripts() {
       linux)
         [[ "$name" == slurm* ]] && { echo "  Skipping $name"; continue; }
         cp "$script" "$HOME/.local/bin/" ;;
-      dev)
+      dev|mac)
         if [[ "$name" == slurm* || "$name" == apptainer-* ]]; then
           echo "  Skipping $name"; continue
         fi
@@ -113,40 +153,43 @@ copy_scripts() {
 }
 
 # -----------------------------------------------------------------------------
-# Copy bashrc.d fragments, skipping hpc-* outside of hpc, and handle login.sh
+# Copy [ba][z]shrc.d fragments, skipping hpc-* outside of hpc, and handle login.sh
 # -----------------------------------------------------------------------------
-copy_bashrc_fragments() {
-  echo "Copying bashrc.d fragments…"
-  local dotfiles_dir
+copy_shell_fragments() {
+  echo "Copying shell rc fragments…"
+  local dotfiles_dir fragment_dir
   dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  fragment_dir="$(get_fragment_dir)"
   shopt -s nullglob
+
   for file in "$dotfiles_dir/bashrc.d/"*; do
+    local filename
     filename=$(basename "$file")
 
-    # skip HPC-only fragments in non-hpc envs
+    # Skip HPC-only fragments in non-hpc envs
     if [[ "$dotfiles_env" != hpc && "$filename" == hpc-* ]]; then
       echo "  Skipping $filename (HPC-specific)"
       continue
     fi
 
-    # preserve existing login.sh, but still configure if newly copied
-    if [[ "$filename" == login.sh && -e "$HOME/.bashrc.d/$filename" ]]; then
+    # Use correct fragment dir (bashrc.d or zshrc.d)
+    local dest_file="$fragment_dir/$filename"
+    # Skip if login.sh already exists (do not overwrite)
+    if [[ "$filename" == login.sh && -e "$dest_file" ]]; then
       echo "  Skipping $filename (already exists)"
-    else 
-      cp "$file" "$HOME/.bashrc.d/"
-      # don't need to do manually add creds in a codespace,
-      # as these can be injected by codespace secrets.
-      # but we still want to export GITHUB_PAT as GH_TOKEN,
-      # for example, if it's not yet set, so we didn't
-      # skip the copy step above.
-      if [[ "$filename" == login.sh && "$dotfiles_env" != codespace ]]; then
-        echo "  Configuring $filename"
-        configure_login
-      fi
+      continue
+    fi
+
+    cp "$file" "$dest_file"
+
+    # Only prompt for creds if not in codespace/dev/mac (i.e., interactive setups)
+    if [[ "$filename" == login.sh && "$dotfiles_env" != codespace ]]; then
+      echo "  Configuring $filename"
+      configure_login
     fi
   done
   shopt -u nullglob
-  echo "bashrc.d fragments copied."
+  echo "Shell rc fragments copied."
 }
 
 # -----------------------------------------------------------------------------
@@ -154,9 +197,12 @@ copy_bashrc_fragments() {
 # -----------------------------------------------------------------------------
 configure_login() {
   echo "Configuring GitHub & Hugging Face credentials in login.sh…"
-  local login_file="$HOME/.bashrc.d/login.sh"
+  local login_file
+  login_file="$(get_fragment_dir)/login.sh"
   [[ -f "$login_file" ]] || return
-  if [[ "$dotfiles_env" == "dev" || "$dotfiles_env" == "codespace" ]]; then
+
+  # Do not prompt in dev, codespace, or mac environments
+  if [[ "$dotfiles_env" == "codespace" ]]; then
     return
   fi
 
@@ -168,7 +214,8 @@ configure_login() {
 
   inject_var() {
     local var="$1" val="$2"
-    sed -i -E "s|^#\s*${var}=.*|${var}=\"${val}\"|" "$login_file"
+    # Replace only commented-out or existing assignments
+    sed -i -E "s|^#?\s*${var}=.*|${var}=\"${val}\"|" "$login_file"
   }
 
   [[ -n "$gh_user" ]] && { inject_var GITHUB_USERNAME "$gh_user"; inject_var GITHUB_USER "$gh_user"; }
@@ -183,7 +230,7 @@ configure_login() {
 }
 
 # -----------------------------------------------------------------------------
-# Copy hidden config files, sanitising .Renviron for wsl/dev
+# Copy hidden config files, sanitising .Renviron for non-hpc environments
 # -----------------------------------------------------------------------------
 copy_hidden_configs_r() {
   echo "Copying hidden config files…"
@@ -197,11 +244,14 @@ copy_hidden_configs_r() {
   fi
 
   local files=( .Renviron .lintr .radian_profile )
-  local dotfiles_dir
+  local dotfiles_dir dest_dir
   dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+  # In the future, you could set a different dest_dir for Mac if you wanted
+  dest_dir="$HOME"
+
   for file in "${files[@]}"; do
-    local src="$dotfiles_dir/r/$file" dest="$HOME/$file"
+    local src="$dotfiles_dir/r/$file" dest="$dest_dir/$file"
     [[ -e "$src" ]] || { echo "  $file not found, skipping"; continue; }
 
     if [[ ! -e "$dest" ]] || ! cmp -s "$src" "$dest"; then
@@ -275,6 +325,7 @@ configure_git() {
     wsl)       def_email="$username@wsl.local" ;;
     dev)       def_email="$username@dev.local" ;;
     codespace) def_email="$username@codespace.local" ;;
+    mac)       def_email="$username@mac.local" ;;
     linux|*)   def_email="$username@linux.local" ;;
   esac
 
@@ -308,6 +359,7 @@ print_completion() {
     linux)  echo "Linux setup complete." ;;
     wsl)    echo "WSL setup complete." ;;
     dev)    echo "Devcontainer setup complete." ;;
+    mac)    echo "Mac setup complete." ;;
     codespace) echo "Codespace setup complete." ;;
   esac
 }
@@ -324,11 +376,11 @@ unset_dotfiles_env() {
 # -----------------------------------------------------------------------------
 main() {
   parse_args "$@"
-  ensure_bashrc_sourcing
+  ensure_shell_rc_sourcing
   prepare_directories
-  normalize_dotfiles
+  normalise_dotfiles
   copy_scripts
-  copy_bashrc_fragments
+  copy_shell_fragments
   copy_hidden_configs_r
   configure_git
   print_completion
