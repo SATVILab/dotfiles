@@ -69,11 +69,15 @@ fi
 
 # ——— Exec the “custom_command” inside the container —————————————————
 if (( ${#custom_command[@]} )); then
+  # join all tokens into one R expression string
+  expr="${custom_command[*]}"
   [[ $quiet != true ]] && \
-    echo "Running inside container: ${custom_command[*]}"
-  # this expands your array exactly as separate args:
-  exec apptainer exec "$sif_path" "${custom_command[@]}"
+    echo "Running inside container: Rscript -e \"$expr\""
+
+  # exec so we replace this script with the container process
+  exec apptainer exec "$sif_path" Rscript -e "$expr"
 else
+  # no R expression? drop to shell
   [[ $quiet != true ]] && echo "Opening interactive shell…"
   exec apptainer shell "$sif_path"
 fi
