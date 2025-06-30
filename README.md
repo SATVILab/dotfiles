@@ -8,7 +8,11 @@ This repo provides an installable, cross-platform dotfiles environment supportin
 * **Devcontainers & GitHub Codespaces** (auto-installs)
 * **macOS** (Zsh/Bash; support untested)
 
-Its primary purpose is to configure Git and/or HuggingFace authentication and configure R within VS Code. 
+It has three purposes:
+
+- Add Git and/or HuggingFace authentication.
+- Configure R within VS Code.
+- Provide HPC utility scripts for working with `Apptainer` and `SLURM`, and keeping large files within the stratch directory rather than your home directory.
 
 ---
 
@@ -58,9 +62,7 @@ Set this repository as your dotfiles in the Codespaces settings. It will automat
 To update your setup after pulling changes:
 
 ```bash
-cd ~/dotfiles
-git pull
-bash install-env.sh <env>
+dotfiles-update <env>
 ```
 
 If in a GitHub codespace, you should rebuild the codespace (full rebuild not needed).
@@ -77,6 +79,7 @@ If in a GitHub codespace, you should rebuild the codespace (full rebuild not nee
 ## Forking
 
 To use this as a base for your own dotfiles, fork this repository and modify the scripts as needed.
+In particular, the `r/.Renviron` file has SATVI-specific environment variables that you may want to change (harmless if you do not, however).
 Feel free to contribute improvements back to the main repository.
 
 ---
@@ -85,8 +88,3 @@ Feel free to contribute improvements back to the main repository.
 
 Feel free to open an issue on the GitHub repository or contact me directly (Miguel Rodo at miguel.rodo@uct.ac.za).
 
-## Resources
-
-* [Dotfiles Guide](https://dotfiles.github.io/)
-* [Apptainer Docs](https://apptainer.org/docs/)
-* [Slurm Docs](https://slurm.schedmd.com/documentation.html)
