@@ -12,7 +12,7 @@ It has three purposes:
 
 - Add Git and/or HuggingFace authentication.
 - Configure R within VS Code.
-- Provide HPC utility scripts for working with `Apptainer` and `SLURM`, and keeping large files within the stratch directory rather than your home directory.
+- Provide HPC utility scripts for working with `Apptainer` and `SLURM`, and keeping large files within the scratch directory rather than your home directory.
 
 ---
 
