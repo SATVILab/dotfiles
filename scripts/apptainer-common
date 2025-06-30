@@ -54,16 +54,14 @@ apptainer_common_default_candidates() {
 # Arguments (all optional, in any order):
 #   --sif           The explicit sif name
 #   --directory     A single directory to search (skips cache)
-#   --preserve-case  If given, don’t lowercase candidates
 apptainer_common_find_sif() {
-  local sif_specified=false preserve_case=false sif_file candidates
+  local sif_specified=false sif_file candidates
   local directory=""
   local arg
   while [[ $# -gt 0 ]]; do
     case $1 in
       --sif)           sif_file="$2"; sif_specified=true; shift 2;;
       --directory)     directory="$2";          shift 2;;
-      --preserve-case) preserve_case=true;      shift;;
       *)               break ;;
     esac
   done
@@ -71,15 +69,12 @@ apptainer_common_find_sif() {
   # 1) Build candidates[]
   if $sif_specified; then
     sif_file="${sif_file%.sif}.sif"
-    $preserve_case || sif_file=$(echo "$sif_file" | tr '[:upper:]' '[:lower:]')
     candidates=( "$sif_file" )
   else
     mapfile -t candidates < <(apptainer_common_default_candidates)
-    if ! $preserve_case; then
-      for i in "${!candidates[@]}"; do
-        candidates[$i]=$(echo "${candidates[$i]}" | tr '[:upper:]' '[:lower:]')
-      done
-    fi
+    for i in "${!candidates[@]}"; do
+      candidates[$i]=$(echo "${candidates[$i]}" | tr '[:upper:]' '[:lower:]')
+    done
   fi
 
   # 2) Build base_dirs[]
