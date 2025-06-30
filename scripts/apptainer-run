@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # bring in only the shared helpers
-source "$HOME/.local/bin/apptainer-common.sh"
+source "$HOME/.local/bin/apptainer-common"
 
 usage() {
   cat <<EOF

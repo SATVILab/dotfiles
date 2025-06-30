@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# apptainer-common.sh — just a collection of functions, no global vars.
+# apptainer-common — just a collection of functions, no global vars.
 
 # Get list of branches (or fall back to main/master)
 apptainer_common_get_branches() {

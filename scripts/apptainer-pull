@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Load shared helpers (must define apptainer_common_get_cache_dirs)
-source "$HOME/.local/bin/apptainer-common.sh"
+source "$HOME/.local/bin/apptainer-common"
 
 usage() {
   cat <<EOF

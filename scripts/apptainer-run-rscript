@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # bring in the shared finder logic
-source "$HOME/.local/bin/apptainer-common.sh"
+source "$HOME/.local/bin/apptainer-common"
 
 usage() {
   cat <<EOF
