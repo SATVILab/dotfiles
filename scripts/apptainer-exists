@@ -9,7 +9,7 @@ usage() {
 Usage: $0 [-s <sif>] [-d <directory>] [-p]
   -s, --sif           : Explicit sif name
   -d, --directory     : Directory to search first
-  -p, --preserve-case : Don’t lowercase the name
+  -p, --preserve-case : Don’t lowercase the nameE
 EOF
   exit 1
 }
