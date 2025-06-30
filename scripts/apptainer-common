@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # apptainer-common — just a collection of functions, no global vars.
+# the primary purpose is to find the path to the SIF file.
 
 # Get list of branches (or fall back to main/master)
 apptainer_common_get_branches() {
