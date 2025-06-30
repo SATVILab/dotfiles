@@ -1,30 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat<<EOF
+Usage: $0 [-s <sif>] [-d <directory>]
+  -s, --sif        Explicit SIF filename (with or without .sif)
+  -d, --directory  Directory to search first (skips cache dirs)
+  -h, --help       Show this help and exit
+EOF
+  exit 1
+}
+
 # parse your flags into args_for_path
+# after your source and arg-splitting boilerplate…
 args_for_path=()
 custom_command=()
+saw_cmd=false
+
 while [[ $# -gt 0 ]]; do
+  if $saw_cmd; then
+    custom_command+=( "$1" ); shift
+    continue
+  fi
+
   case $1 in
-    -s|--sif)           args_for_path+=(--sif "$2");   shift 2;;
-    -d|--directory)     args_for_path+=(--directory "$2"); shift 2;;
-    -h|--help)          usage;;
-    --)                 shift; custom_command=( "$@" ); break;;
-    -*|--*)             usage;;
-    *)                  custom_command+=( "$1" ); shift;;
+    -s|--sif)
+      args_for_path+=(--sif "$2"); shift 2;;
+    -d|--directory)
+      args_for_path+=(--directory "$2"); shift 2;;
+    -h|--help)
+      usage;;
+    --)
+      saw_cmd=true; shift;;
+    -*)
+      usage;;
+    *)
+      saw_cmd=true
+      custom_command+=( "$1" ); shift
+      ;;
   esac
 done
 
-if sif_path=$(apptainer-path "${args_for_path[@]}"); then
-  echo "Found: $sif_path"
-else
+# 3) Find the .sif
+if ! sif_path=$(apptainer-path "${args_for_path[@]}"); then
   echo "Error: no SIF found" >&2
   exit 1
 fi
+echo "Found SIF: $sif_path"
 
-# run inside container (exec replaces this script with the apptainer process)
+# 4) Exec into it
 if (( ${#custom_command[@]} )); then
-  echo "Executing: ${custom_command[*]}"
+  echo "Running inside container: ${custom_command[*]}"
   exec apptainer exec "$sif_path" "${custom_command[@]}"
 else
   echo "Opening interactive shell…"

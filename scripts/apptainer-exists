@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat<<EOF
+Usage: $0 [-s <sif>] [-d <directory>]
+  -s, --sif        Explicit SIF filename (with or without .sif)
+  -d, --directory  Directory to search first (skips cache dirs)
+  -h, --help       Show this help and exit
+EOF
+  exit 1
+}
+
 # parse your flags into args_for_path
 args_for_path=()
 while [[ $# -gt 0 ]]; do
