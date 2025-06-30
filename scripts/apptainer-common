@@ -2,53 +2,7 @@
 # apptainer-common — just a collection of functions, no global vars.
 # the primary purpose is to find the path to the SIF file.
 
-# Get list of branches (or fall back to main/master)
-apptainer_common_get_branches() {
-    if ! git rev-parse --is-inside-work-tree &>/dev/null \
-       || ! git symbolic-ref --quiet HEAD &>/dev/null; then
-        echo main master
-    else
-        # list all local branches only by their short names
-        git for-each-ref --format='%(refname:short)' refs/heads/ | tr '/' '_'
-    fi
-} 
 
-apptainer_common_get_current_branch() {
-  if ! git rev-parse --is-inside-work-tree &>/dev/null \
-     || ! git symbolic-ref --quiet HEAD &>/dev/null; then
-    echo main
-  else
-    git symbolic-ref --short HEAD | tr '/' '_'
-  fi
-}
-
-# Emit default <wd>-<branch>.sif plus <wd>.sif
-apptainer_common_default_candidates() {
-    local base current branches br
-    base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
-    current=$(apptainer_common_get_current_branch)
-
-    # 1) current branch first
-    echo "${base}-${current}.sif"
-
-    # 2) main, if different
-    [[ "$current" != "main" ]] && echo "${base}-main.sif"
-
-    # 3) master, if different
-    [[ "$current" != "master" ]] && echo "${base}-master.sif"
-
-    # 4) remaining branches
-    mapfile -t branches < <(git for-each-ref --format='%(refname:short)' refs/heads/)
-    for br in "${branches[@]}"; do
-        # skip current, main, master
-        [[ "$br" == "$current" || "$br" == "main" || "$br" == "master" ]] && continue
-        br=$(echo "$br" | tr '/' '_')
-        echo "${base}-${br}.sif"
-    done
-
-    # 5) no-branch fallback
-    echo "${base}.sif"
-}
 
 # Locate the SIF: prints the full path on success, returns 0; returns 1 if none found.
 # Arguments (all optional, in any order):
@@ -104,3 +58,52 @@ apptainer_common_find_sif() {
 
   return 1
 }
+
+# Emit default <wd>-<branch>.sif plus <wd>.sif
+apptainer_common_default_candidates() {
+    local base current branches br
+    base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
+    current=$(apptainer_common_get_current_branch)
+
+    # 1) current branch first
+    echo "${base}-${current}.sif"
+
+    # 2) main, if different
+    [[ "$current" != "main" ]] && echo "${base}-main.sif"
+
+    # 3) master, if different
+    [[ "$current" != "master" ]] && echo "${base}-master.sif"
+
+    # 4) remaining branches
+    mapfile -t branches < <(apptainer_common_get_branches)
+    for br in "${branches[@]}"; do
+        # skip current, main, master
+        [[ "$br" == "$current" || "$br" == "main" || "$br" == "master" ]] && continue
+        br=$(echo "$br" | tr '/' '_')
+        echo "${base}-${br}.sif"
+    done
+
+    # 5) no-branch fallback
+    echo "${base}.sif"
+}
+
+apptainer_common_get_current_branch() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null \
+     || ! git symbolic-ref --quiet HEAD &>/dev/null; then
+    echo main
+  else
+    git symbolic-ref --short HEAD | tr '/' '_'
+  fi
+}
+
+
+# Get list of branches (or fall back to main/master)
+apptainer_common_get_branches() {
+    if ! git rev-parse --is-inside-work-tree &>/dev/null \
+       || ! git symbolic-ref --quiet HEAD &>/dev/null; then
+        echo main master
+    else
+        # list all local branches only by their short names
+        git for-each-ref --format='%(refname:short)' refs/heads/ | tr '/' '_'
+    fi
+} 
