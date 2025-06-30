@@ -22,7 +22,7 @@ DIRECTORY=""
 CUSTOM_EXPR=()
 
 # lower-case branch and working-dir basename
-branch=$(apptainer_common_get_branch | tr '[:upper:]' '[:lower:]')
+branch=$(apptainer_common_get_current_branch | tr '[:upper:]' '[:lower:]')
 base=$(basename "$PWD"      | tr '[:upper:]' '[:lower:]')
 
 # 2) Parse flags and collect trailing R expression

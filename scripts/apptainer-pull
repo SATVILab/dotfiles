@@ -23,7 +23,7 @@ EOF
 
 # Defaults
 SIF_NAME=""
-branch="$(apptainer_common_get_branch | tr '[:upper:]' '[:lower:]')"
+branch="$(apptainer_common_get_current_branch | tr '[:upper:]' '[:lower:]')"
 BRANCH="-$branch"
 NO_APPEND=false
 TAG="latest";
