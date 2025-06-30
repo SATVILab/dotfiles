@@ -7,7 +7,9 @@ Usage: $0 [-s <sif>] [-d <directory>] [-n] -- <R expression>
   -s, --sif           : Explicit SIF filename (with or without .sif)
   -d, --directory     : Directory to search first (skips cache dirs)
   -h, --help          : Show this help and exit
-  <R expression>      : The R code to run (passed to Rscript -e)
+  <R expression>      : The R code to run (passed to Rscript -e). Use single quotes
+                        : to avoid shell expansion issues. If no expression is given,
+                        : an interactive R shell will be opened.
 EOF
   exit 1
 }
@@ -78,6 +80,6 @@ if (( ${#custom_command[@]} )); then
   exec apptainer exec "$sif_path" Rscript -e "$expr"
 else
   # no R expression? drop to shell
-  [[ $quiet != true ]] && echo "Opening interactive shell…"
-  exec apptainer shell "$sif_path"
+  [[ $quiet != true ]] && echo "No command given"
+  exit 1
 fi
