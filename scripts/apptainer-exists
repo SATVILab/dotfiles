@@ -1,32 +1,18 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# bring in only those shared functions—no globals leak here
-source "$HOME/.local/bin/apptainer-common"
-
-usage() {
-  cat<<EOF
-Usage: $0 [-s <sif>] [-d <directory>] [-p]
-  -s, --sif           : Explicit sif name
-  -d, --directory     : Directory to search first
-  -p, --preserve-case : Don’t lowercase the nameE
-EOF
-  exit 1
-}
-
-# parse your flags into args_for_common
-args_for_common=()
+# parse your flags into args_for_path
+args_for_path=()
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -s|--sif)           args_for_common+=(--sif "$2");   shift 2;;
-    -d|--directory)     args_for_common+=(--directory "$2"); shift 2;;
-    -p|--preserve-case) args_for_common+=(--preserve-case); shift;;
+    -s|--sif)           args_for_path+=(--sif "$2");   shift 2;;
+    -d|--directory)     args_for_path+=(--directory "$2"); shift 2;;
     -h|--help)          usage;;
     *)                  usage;;
   esac
 done
 
-if sif_path=$(apptainer_common_find_sif "${args_for_common[@]}"); then
+if sif_path=$(apptainer-path "${args_for_path[@]}"); then
   echo "Found: $sif_path"
   exit 0
 else

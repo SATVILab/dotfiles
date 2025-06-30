@@ -1,78 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# bring in only the shared helpers
-source "$HOME/.local/bin/apptainer-common"
-
-usage() {
-  cat <<EOF
-Usage: $0 [-s <sif>] [-d <directory>] [-n] [--] [<command> ...]
-  -s, --sif <sif>          : Explicit SIF filename
-  -d, --directory <dir>    : Directory to search first
-  -n, --no-append          : Don’t append branch to default SIF name
-  <command>                : Command to run in the container (default: shell)
-EOF
-  exit 1
-}
-
-# 1) Defaults
-SIF_NAME=""
-NO_APPEND=false
-DIRECTORY=""
-CUSTOM_COMMAND=()
-
-# get lowercase branch and cwd basename
-branch=$(apptainer_common_get_current_branch | tr '[:upper:]' '[:lower:]')
-base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
-
-# 2) Parse flags + capture any trailing command
+# parse your flags into args_for_path
+args_for_path=()
+custom_command=()
 while [[ $# -gt 0 ]]; do
   case $1 in
-    -s|--sif)      SIF_NAME="$2";   shift 2;;
-    -d|--directory) DIRECTORY="$2"; shift 2;;
-    -n|--no-append) NO_APPEND=true;  shift;;
-    -h|--help)     usage;;
-    --)            shift; CUSTOM_COMMAND=( "$@" ); break;;
-    -*|--*)        usage;;
-    *)             CUSTOM_COMMAND+=( "$1" ); shift;;
+    -s|--sif)           args_for_path+=(--sif "$2");   shift 2;;
+    -d|--directory)     args_for_path+=(--directory "$2"); shift 2;;
+    -h|--help)          usage;;
+    --)                 shift; custom_command=( "$@" ); break;;
+    -*|--*)             usage;;
+    *)                  custom_command+=( "$1" ); shift;;
   esac
 done
 
-# 3) Compute default SIF_NAME if not provided
-if [[ -z "$SIF_NAME" ]]; then
-  if $NO_APPEND; then
-    SIF_NAME="${base}.sif"
-  else
-    SIF_NAME="${base}-${branch}.sif"
-  fi
-fi
-
-# 4) Locate the SIF file
-find_args=( --sif "$SIF_NAME" )
-[[ -n "$DIRECTORY" ]] && find_args+=( --directory "$DIRECTORY" )
-
-if ! sif_path=$(apptainer_common_find_sif "${find_args[@]}"); then
-  echo "Error: could not locate SIF '$SIF_NAME'" >&2
+if sif_path=$(apptainer-path "${args_for_path[@]}"); then
+  echo "Found: $sif_path"
+else
+  echo "Error: no SIF found" >&2
   exit 1
 fi
 
-echo "Using SIF: $sif_path"
-
-
-# 5) Run inside the container
-
-# Quote each part of the custom command
-if [ "${#CUSTOM_COMMAND[@]}" -gt 0 ]; then
-    for i in "${!CUSTOM_COMMAND[@]}"; do
-        CUSTOM_COMMAND[$i]=$(printf "%q" "${CUSTOM_COMMAND[$i]}")
-    done
-    CUSTOM_COMMAND_STRING="${CUSTOM_COMMAND[*]}"
-    echo "Running custom command: $CUSTOM_COMMAND_STRING"
-    apptainer exec "$SIF_PATH" bash -c "$CUSTOM_COMMAND_STRING"
+# run inside container (exec replaces this script with the apptainer process)
+if (( ${#custom_command[@]} )); then
+  echo "Executing: ${custom_command[*]}"
+  exec apptainer exec "$sif_path" "${custom_command[@]}"
 else
   echo "Opening interactive shell…"
-  apptainer shell "$sif_path"
+  exec apptainer shell "$sif_path"
 fi
-
-
-echo "Run apptainer command completed successfully."
