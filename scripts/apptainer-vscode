@@ -3,81 +3,118 @@ set -euo pipefail
 
 usage() {
   cat<<EOF
-Usage: $0 [-s <sif>] [-d <directory>]
+Usage: $0 [-s <sif>] [-d <directory>] [-c] [-V <version>]
   -s, --sif        Explicit SIF filename (with or without .sif)
   -d, --directory  Directory to search first (skips cache dirs)
-  -c, --clean                 : Kill/prune/unregister existing VS Code tunnels before starting
-  -V, --vscode-version <ver>  : Version of VS Code to install (default: latest)
+  -c, --clean      Kill/prune/unregister existing VS Code tunnels before starting
+  -V, --vscode-version <ver>  Version of VS Code to install (default: latest)
   -h, --help       Show this help and exit
 EOF
   exit 1
 }
 
-# parse your flags into args_for_path
-# after your source and arg-splitting boilerplate…
-args_for_exists=()
+# ——— Defaults —————————————————
+args_for_path=()
 clean=false
 vscode_version="latest"
-while [[ $# -gt 0 ]]; do
-  if $saw_cmd; then
-    custom_command+=( "$1" ); shift
-    continue
-  fi
 
+# parse flags
+while [[ $# -gt 0 ]]; do
   case $1 in
     -s|--sif)
-      args_for_exists+=(--sif "$2"); shift 2;;
+      args_for_path+=(--sif "$2")
+      shift 2
+      ;;
     -d|--directory)
-      args_for_exists+=(--directory "$2"); shift 2;;
-    -c|--clean)        clean=true;           shift;;
-    -V|--vscode-version) vscode_version="$2"; shift 2;;
+      args_for_path+=(--directory "$2")
+      shift 2
+      ;;
+    -c|--clean)
+      clean=true
+      shift
+      ;;
+    -V|--vscode-version)
+      vscode_version="$2"
+      shift 2
+      ;;
     -h|--help)
-      usage;;
+      usage
+      ;;
     -*)
-      usage;;
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+    *)
+      # no positional args expected
+      usage
+      ;;
   esac
 done
 
-# find the sif
-if ! apptainer-exists "${args_for_exists[@]}"; then
+# 1) locate the SIF
+if ! sif_path=$(apptainer-path "${args_for_path[@]}"); then
   echo "Error: no SIF found" >&2
   exit 1
 fi
 echo "Found SIF: $sif_path"
 
-# ensure `code` cli
+# 2) ensure `code` CLI is installed in $HOME/.local/bin
 cli_path="$HOME/.local/bin/code"
+path_install_script="$(dirname "$(realpath "$0")")/install-vscode.sh"
+
 if [[ ! -x "$cli_path" ]]; then
-  if [ -f "$cli_path" ]; then
-    echo "Removing existing non-executable 'code' CLI at $cli_path"
+  [[ -f "$cli_path" ]] && {
+    echo "Removing old non-executable CLI: $cli_path"
     rm -f "$cli_path"
-  fi
-  echo "'code' CLI not found, installing VS Code $vscode_version..."
-  apptainer-run -s "$basename($sif_path)" -d "$dirname($sif_path)" install-vscode.sh -V "$vscode_version" -b "$HOME/.local/bin"
+  }
+  echo "Installing VS Code CLI (version $vscode_version)..."
+  apptainer-run \
+    -s "$(basename "$sif_path")" \
+    -d "$(dirname "$sif_path")" \
+    -q \
+    "$path_install_script" \
+    -V "$vscode_version" \
+    -b "$cli_path"
 else
   echo "Updating VS Code CLI (if needed)..."
-  apptainer-run -s "$basename($sif_path)" -d "$dirname($sif_path)" "$cli_path" update || \
-    echo "→ update either succeeded or was not needed"
+  apptainer-run \
+    -s "$(basename "$sif_path")" \
+    -d "$(dirname "$sif_path")" \
+     -q \
+    "$cli_path" update \
+    || echo "→ update either succeeded or wasn’t needed"
 fi
 
-# 5) Clean up existing tunnels if requested
+# 3) optionally clean up any existing tunnels
 if $clean; then
   echo "Cleaning up existing VS Code tunnels..."
   for cmd in kill prune unregister; do
-    apptainer-run -s "$basename($sif_path)" -d "$dirname($sif_path)" "$cli_path" tunnel $cmd || true
+    apptainer-run \
+      -s "$(basename "$sif_path")" \
+      -d "$(dirname "$sif_path")" \
+      -q \
+      "$cli_path" tunnel "$cmd" \
+      || true
     sleep 1
   done
 fi
 
-# ensure we stop tunnels on exit
+# 4) ensure tunnels are killed on exit
 cleanup() {
-  echo "Stopping any running VS Code tunnels..."
-  apptainer-run -s "$basename($sif_path)" -d "$dirname($sif_path)" "$cli_path" tunnel kill || true
+  echo "Stopping VS Code tunnels..."
+  apptainer-run \
+    -s "$(basename "$sif_path")" \
+    -d "$(dirname "$sif_path")" \
+    -q \
+    "$cli_path" tunnel kill \
+    || true
 }
-trap cleanup EXIT
+trap cleanup EXIT SIGINT SIGTERM ERR
 
-# 6) Start the VS Code tunnel
+# 5) start the tunnel interactively
 echo "Starting VS Code tunnel..."
-apptainer-run -s "$basename($sif_path)" -d "$dirname($sif_path)" "$cli_path" tunnel --accept-server-license-terms
-
-
+exec apptainer-run \
+  -s "$(basename "$sif_path")" \
+  -d "$(dirname "$sif_path")" \
+  -q \
+  "$cli_path" tunnel --accept-server-license-terms
