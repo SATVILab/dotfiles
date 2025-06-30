@@ -3,17 +3,18 @@
 
 # Get list of branches (or fall back to main/master)
 apptainer_common_get_branches() {
-  if ! git rev-parse --is-inside-work-tree &>/dev/null \
-     || ! git symbolic-ref --quiet HEAD 2>/dev/null; then
-    echo main master
-  else
-    git symbolic-ref --short HEAD | tr '/' '_'
-  fi
-}
+    if ! git rev-parse --is-inside-work-tree &>/dev/null \
+       || ! git symbolic-ref --quiet HEAD &>/dev/null; then
+        echo main master
+    else
+        # list all local branches only by their short names
+        git for-each-ref --format='%(refname:short)' refs/heads/ | tr '/' '_'
+    fi
+} 
 
-apptainer_common_get_branch() {
+apptainer_common_get_current_branch() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null \
-     || ! git symbolic-ref --quiet HEAD 2>/dev/null; then
+     || ! git symbolic-ref --quiet HEAD &>/dev/null; then
     echo main
   else
     git symbolic-ref --short HEAD | tr '/' '_'
@@ -24,7 +25,7 @@ apptainer_common_get_branch() {
 apptainer_common_default_candidates() {
     local base current branches br
     base=$(basename "$PWD" | tr '[:upper:]' '[:lower:]')
-    current=$(apptainer_common_get_branch)
+    current=$(apptainer_common_get_current_branch)
 
     # 1) current branch first
     echo "${base}-${current}.sif"
