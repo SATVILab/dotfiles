@@ -348,6 +348,48 @@ configure_git() {
   echo "Git configuration complete."
 }
 
+# -----------------------------------------------------------------------------
+# Ensure dotfiles-update knows where the dotfiles repo is
+# -----------------------------------------------------------------------------
+ensure_dotfiles_dir() {
+  local file="$HOME/.local/bin/dotfiles-update"
+  [[ -f "$file" ]] || { echo "Error: $file does not exist." >&2; return 1; }
+  local dirval="${BASH_SOURCE[0]}"
+  local tmp skip=0
+  tmp="$(mktemp)" || { echo "Error: cannot create temp file" >&2; return 1; }
+
+  while IFS= read -r line; do
+    # If we flagged this line to be skipped, clear flag and continue
+    if [[ $skip -eq 1 ]]; then
+      skip=0
+      continue
+    fi
+
+    # Print the current line
+    printf '%s\n' "$line" >>"$tmp"
+
+    # If this is the pipefail anchor, and we haven't inserted yet...
+    if [[ "$line" == "set -euo pipefail" ]]; then
+      # Peek at the next line
+      IFS= read -r next || next=""
+
+      if [[ "$next" =~ ^DOTFILES_DIR= ]]; then
+        # Already in place, just emit unchanged
+        printf '%s\n' "$next" >>"$tmp"
+      else
+        # Not present—insert our definition first
+        printf 'DOTFILES_DIR="%s"\n' "$dirval" >>"$tmp"
+        # Then re-emit the peeked line (if any)
+        [[ -n "$next" ]] && printf '%s\n' "$next" >>"$tmp"
+      fi
+
+      # Tell the loop to skip printing 'next' again
+      skip=1
+    fi
+  done <"$file"
+
+  mv "$tmp" "$file"
+}
 
 # -----------------------------------------------------------------------------
 # Print final success message
@@ -382,6 +424,7 @@ main() {
   copy_shell_fragments
   copy_hidden_configs_r
   configure_git
+  ensure_dotfiles_dir
   print_completion
   unset_dotfiles_env
 }
