@@ -2,10 +2,10 @@
 
 dotfiles_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$CODESPACES" = "true" ]; then
-  echo "Running in Codespaces environment"
+  echo "Setting up dotfiles for Codespaces"
   "$dotfiles_dir/install-env.sh" codespace
 else
-  echo "Not running in Codespaces environment"
+  echo "Setting up dotfiles for devcontainer environment"
   "$dotfiles_dir/install-env.sh" dev
 fi
 
