@@ -8,40 +8,59 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 usage() {
   cat <<EOF
-Usage: $0 <env>
+Usage: $0 [env]
 
-<env> must be one of:
+[env] (optional): One of:
   hpc       - HPC setup
   linux     - Linux setup (not in a container)
   wsl       - WSL setup (not in a container)
   dev       - Devcontainer setup inside Linux/WSL
-  codespace - Devcontainer setup inside Codespace setup)
+  codespace - Devcontainer setup inside Codespace
   mac       - MacOS setup
 
-Example:
+If [env] is omitted:
+  - If run inside a GitHub Codespace (CODESPACES=true), defaults to: codespace
+  - Otherwise, defaults to: dev
+
+Examples:
   $0 hpc
   $0 linux
   $0 wsl
   $0 dev
   $0 codespace
   $0 mac
+  $0            # Uses default logic (see above)
+
 EOF
   exit 1
 }
 
 parse_args() {
   echo "Parsing arguments…"
-  [[ $# -eq 1 ]] || usage
-  dotfiles_env="$1"
+  if [[ $# -eq 0 ]]; then
+    if [[ "${CODESPACES:-}" == "true" ]]; then
+      echo "No environment argument supplied, but running in a GitHub Codespace (CODESPACES=true)."
+      dotfiles_env="codespace"
+    else
+      echo "No environment argument supplied. Defaulting to 'dev' environment."
+      dotfiles_env="dev"
+    fi
+  else
+    dotfiles_env="$1"
+  fi
   case "$dotfiles_env" in
     hpc|linux|wsl|dev|codespace|codespaces|mac) ;;
-    *) echo "Error: invalid environment '$dotfiles_env'." >&2; usage ;;
+    *)
+      echo "Error: invalid environment '$dotfiles_env'." >&2
+      usage
+      ;;
   esac
   if [[ "$dotfiles_env" == "codespaces" ]]; then
     dotfiles_env="codespace"
   fi
   echo "Arguments parsed successfully. Environment set to '$dotfiles_env'."
 }
+
 
 # -----------------------------------------------------------------------------
 # Ensure ~/.bashrc will source ~/.bashrc.d/*.sh fragments
