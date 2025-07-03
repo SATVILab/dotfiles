@@ -60,6 +60,6 @@ use_scratch() {
 }
 
 # Don't run if if /scratch/$USER directory does not exist
-if [[ -d "/scratch/$USER" && "$HOSTNAME" =~ ^srvrochpc[0-9]+ ]]; then
+if [[ -d "/scratch/$USER" ]]; then
     use_scratch
 fi
