@@ -23,8 +23,8 @@ It has three purposes:
 Clone and install for your environment:
 
 ```bash
-git clone https://github.com/SATVILab/dotfiles.git "$HOME"/dotfiles
-"$HOME"/dotfiles/install-env.sh <env>
+git clone https://github.com/SATVILab/dotfiles.git "$HOME"/.dotfiles
+"$HOME"/.dotfiles/install-env.sh <env>
 ```
 
 Where `<env>` is one of:

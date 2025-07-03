@@ -46,7 +46,7 @@ parse_args() {
 # Clone the repo if missing, or pull latest changes
 # -----------------------------------------------------------------------------
 update_repo() {
-  DOTFILES_DIR="$HOME/dotfiles"
+  DOTFILES_DIR="$HOME/.dotfiles"
   echo "=== Updating dotfiles in $DOTFILES_DIR ==="
   if [[ ! -d "$DOTFILES_DIR" ]]; then
     echo "Cloning dotfiles repository..."
@@ -64,7 +64,7 @@ update_repo() {
 # Invoke the unified installer script
 # -----------------------------------------------------------------------------
 run_installer() {
-  installer="$HOME/dotfiles/install-env.sh"
+  installer="$HOME/.dotfiles/install-env.sh"
   echo
   echo "=== Running unified installer for '$env' ==="
   if [[ ! -f "$installer" ]]; then
