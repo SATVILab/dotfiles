@@ -11,9 +11,12 @@ usage() {
 Usage: $0 <env>
 
 <env> must be one of:
-  hpc    – for your HPC setup
-  wsl    – for your WSL (devcontainer) setup
-  dev    – for your Devcontainer (WSL) setup
+  hpc       - HPC setup
+  linux     - Linux setup (not in a container)
+  wsl       - WSL setup (not in a container)
+  dev       - Devcontainer setup inside Linux/WSL
+  codespace - Devcontainer setup inside Codespace setup)
+  mac       - MacOS setup
 
 Description:
   Clones or updates the dotfiles repo and then invokes
@@ -21,8 +24,11 @@ Description:
 
 Example:
   $0 hpc
+  $0 linux
   $0 wsl
   $0 dev
+  $0 codespace
+  $0 mac
 EOF
   exit 1
 }
@@ -31,26 +37,28 @@ EOF
 # Parse and validate command-line arguments
 # -----------------------------------------------------------------------------
 parse_args() {
+  echo "Parsing arguments…"
   [[ $# -eq 1 ]] || usage
-  env="$1"
-  case "$env" in
-    hpc|wsl|dev) ;;
-    *)
-      echo "Error: invalid environment '$env'." >&2
-      usage
-      ;;
+  dotfiles_env="$1"
+  case "$dotfiles_env" in
+    hpc|linux|wsl|dev|codespace|codespaces|mac) ;;
+    *) echo "Error: invalid environment '$dotfiles_env'." >&2; usage ;;
   esac
+  if [[ "$dotfiles_env" == "codespaces" ]]; then
+    dotfiles_env="codespace"
+  fi
+  echo "Arguments parsed successfully. Environment set to '$dotfiles_env'."
 }
 
 # -----------------------------------------------------------------------------
 # Clone the repo if missing, or pull latest changes
 # -----------------------------------------------------------------------------
 update_repo() {
-  DOTFILES_DIR="$HOME/.dotfiles"
+  DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
   echo "=== Updating dotfiles in $DOTFILES_DIR ==="
   if [[ ! -d "$DOTFILES_DIR" ]]; then
     echo "Cloning dotfiles repository..."
-    git clone https://SATVILab/dotfiles.git "$DOTFILES_DIR"
+    git clone https://github.com/SATVILab/dotfiles.git "$DOTFILES_DIR"
   else
     echo "Pulling latest changes..."
     pushd "$DOTFILES_DIR" >/dev/null
@@ -64,15 +72,16 @@ update_repo() {
 # Invoke the unified installer script
 # -----------------------------------------------------------------------------
 run_installer() {
-  installer="$HOME/.dotfiles/install-env.sh"
+  DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+  installer="$DOTFILES_DIR/install-env.sh"
   echo
-  echo "=== Running unified installer for '$env' ==="
+  echo "=== Running unified installer for '$dotfiles_env' ==="
   if [[ ! -f "$installer" ]]; then
     echo "Error: $installer not found." >&2
     exit 1
   fi
   chmod +x "$installer"
-  "$installer" "$env"
+  "$installer" "$dotfiles_env"
 }
 
 # -----------------------------------------------------------------------------
@@ -109,7 +118,7 @@ main() {
   remind_source
 
   echo
-  echo "Dotfiles update complete for '$env'."
+  echo "Dotfiles update complete for '$dotfiles_env'."
 }
 
 main "$@"
