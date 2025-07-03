@@ -352,44 +352,37 @@ configure_git() {
 # Ensure dotfiles-update knows where the dotfiles repo is
 # -----------------------------------------------------------------------------
 ensure_dotfiles_dir() {
-  local file="$HOME/.local/bin/dotfiles-update"
-  [[ -f "$file" ]] || { echo "Error: $file does not exist." >&2; return 1; }
+  local file="${HOME}/.local/bin/dotfiles-update"
   local dirval="${BASH_SOURCE[0]}"
-  local tmp skip=0
-  tmp="$(mktemp)" || { echo "Error: cannot create temp file" >&2; return 1; }
 
-  while IFS= read -r line; do
-    # If we flagged this line to be skipped, clear flag and continue
-    if [[ $skip -eq 1 ]]; then
-      skip=0
-      continue
-    fi
+  # Sanity check
+  if [[ ! -f "$file" ]]; then
+    echo "Error: $file does not exist." >&2
+    return 0
+  fi
 
-    # Print the current line
-    printf '%s\n' "$line" >>"$tmp"
+  # Backup in case you need to roll back
+  cp "$file" "${file}.bak"
 
-    # If this is the pipefail anchor, and we haven't inserted yet...
-    if [[ "$line" == "set -euo pipefail" ]]; then
-      # Peek at the next line
-      IFS= read -r next || next=""
+  # Insert the DOTFILES_DIR line immediately after `set -euo pipefail`
+  # but only if the next non-blank line does *not* already begin with DOTFILES_DIR=
+  sed -i -e '/^set -euo pipefail$/ {
+    :loop
+    n
+    # if this line is blank, skip it
+    /^[[:space:]]*$/b loop
+    # if it already starts with DOTFILES_DIR=, do nothing and quit
+    /^[[:space:]]*DOTFILES_DIR=/b end
+    # otherwise, insert our line before it
+    i\
+DOTFILES_DIR="'"$dirval"'"
+    :end
+  }' "$file"
 
-      if [[ "$next" =~ ^DOTFILES_DIR= ]]; then
-        # Already in place, just emit unchanged
-        printf '%s\n' "$next" >>"$tmp"
-      else
-        # Not present—insert our definition first
-        printf 'DOTFILES_DIR="%s"\n' "$dirval" >>"$tmp"
-        # Then re-emit the peeked line (if any)
-        [[ -n "$next" ]] && printf '%s\n' "$next" >>"$tmp"
-      fi
-
-      # Tell the loop to skip printing 'next' again
-      skip=1
-    fi
-  done <"$file"
-
-  mv "$tmp" "$file"
+  echo "Patched DOTFILES_DIR in $file (backup at ${file}.bak)."
 }
+
+
 
 # -----------------------------------------------------------------------------
 # Print final success message
