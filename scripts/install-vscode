@@ -118,6 +118,13 @@ if [[ -z $code_bin ]]; then
 fi
 
 echo "Installing → $bin_dir/code"
+if [ -d "$code_bin" ]; then
+  [ ! -f "$code_bin/code" ] && {
+    echo "Error: 'code' binary not found in $code_bin" >&2
+    exit 1
+  }
+  code_bin="$code_bin/code"
+fi
 install -Dm755 "$code_bin" "$bin_dir/code"
 
 echo "Done! Run 'code --version' to verify."
