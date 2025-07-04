@@ -74,7 +74,7 @@ if [[ ! -x "$cli_path" ]]; then
     -q \
     "$path_install_script" \
     -V "$vscode_version" \
-    -b "$cli_path"
+    -b "$(dirname "$cli_path")"
 else
   echo "Updating VS Code CLI (if needed)..."
   apptainer-run \
