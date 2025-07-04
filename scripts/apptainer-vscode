@@ -76,13 +76,7 @@ if [[ ! -x "$cli_path" ]]; then
     -V "$vscode_version" \
     -b "$(dirname "$cli_path")"
 else
-  echo "Updating VS Code CLI (if needed)..."
-  apptainer-run \
-    -s "$(basename "$sif_path")" \
-    -d "$(dirname "$sif_path")" \
-     -q \
-    "$cli_path" update \
-    || echo "→ update either succeeded or wasn’t needed"
+  echo "VS Code CLI already installed at $cli_path"
 fi
 
 # 3) optionally clean up any existing tunnels
