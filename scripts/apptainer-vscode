@@ -60,7 +60,7 @@ echo "Found SIF: $sif_path"
 
 # 2) ensure `code` CLI is installed in $HOME/.local/bin
 cli_path="$HOME/.local/bin/code"
-path_install_script="$(dirname "$(realpath "$0")")/install-vscode.sh"
+path_install_script="$(dirname "$(realpath "$0")")/install-vscode"
 
 if [[ ! -x "$cli_path" ]]; then
   [[ -f "$cli_path" ]] && {
