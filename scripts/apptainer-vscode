@@ -113,7 +113,7 @@ trap cleanup EXIT SIGINT SIGTERM ERR
 
 # 5) start the tunnel interactively
 echo "Starting VS Code tunnel..."
-exec apptainer-run \
+apptainer-run \
   -s "$(basename "$sif_path")" \
   -d "$(dirname "$sif_path")" \
   -q \
