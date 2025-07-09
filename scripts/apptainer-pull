@@ -13,7 +13,7 @@ usage() {
 Usage: $0 [-R <registry>] (-u <user> | -o <owner>) [-p <password>] [-i <images>] [-t <tag>] [-f <file>] [-d <dir_base>] [-F] [-D] [-h]
   -R, --registry   Registry ('docker' or 'ghcr'; defaults to 'ghcr')
   -u, --user       Username for login (required for private images; defaults to \$GITHUB_USER for GHCR)
-  -o, --owner      Owner override (defaults to Git remote owner)
+  -o, --owner      Owner/namespace (defaults to GitHub user)
   -p, --password   Password/token (GHCR reads \$GH_TOKEN, \$GITHUB_TOKEN or \$GITHUB_PAT if unset)
   -i, --image      Image name(s), comma-separated (defaults to <cwd_basename>-<branch>, then <cwd_basename>)
   -t, --tag        Tag (defaults to 'latest')
@@ -104,16 +104,18 @@ get_owner() {
     return
   fi
 
-  # 1) Try from token (GHCR only)
   if [[ "$registry" == "ghcr" ]]; then
-    owner="$(get_owner_from_token)"
-    debug_log "  → from token: '${owner:-<none>}'"
-  fi
-
-  # 2) Fall back to Git remote
-  if [[ -z "$owner" ]]; then
     owner="$(get_owner_from_remote)"
     debug_log "  → from git remote: '${owner:-<none>}'"
+    if [[ -z "$owner" ]]; then
+      owner="$(get_owner_from_token)"
+      debug_log "  → from token: '${owner:-<none>}'"
+    fi
+  fi
+
+  if [[ -n "$login_user" ]]; then
+    owner="$login_user"
+    debug_log "  → owner set from login_user: '$owner'"
   fi
 
   # 3) Give up if still empty
@@ -124,22 +126,27 @@ get_owner() {
 
 # Try to fetch the username via GitHub API
 get_owner_from_token() {
-  if [[ -n "$password" ]]; then
-    curl -s -H "Authorization: token $password" \
-      https://api.github.com/user \
-    | grep '"login"' \
-    | sed -E 's/.*"login": "([^"]+)".*/\1/'
+  [[ -z "$password" ]] && return
+  local status
+  status=$(curl -w '%{http_code}' -s \
+    -H "Authorization: token $password" \
+    https://api.github.com/user -o /tmp/gh_user.json)
+  if [[ $status -ne 200 ]]; then
+    debug_log "  → token lookup failed (HTTP $status)"
+    return
   fi
+  grep -m1 -oP '"login":\s*"\K[^"]+' /tmp/gh_user.json \
+    | sed -E 's/.*"login": *"([^"]+)".*/\1/'
 }
+
 
 # Parse ‘owner’ from `git remote origin` URL
 get_owner_from_remote() {
-  local remote url owner
-  url="$(git config --get remote.origin.url 2>/dev/null)" || return
-  if [[ "$url" =~ github\.com[:/]+([^/]+)/ ]]; then
+  local url owner
+  url=$(git config --get remote.origin.url 2>/dev/null) || return
+  if [[ $url =~ github\.com[:/]+([^/]+)/[^/]+(\.git)?$ ]]; then
     owner="${BASH_REMATCH[1]}"
-    # strip trailing “.git” if present
-    echo "${owner%.git}"
+    echo "$owner"
   fi
 }
 
