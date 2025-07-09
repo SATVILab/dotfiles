@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
 usage() {
-  cat<<EOF
-Usage: $0 -R <registry> -u <user> -o <org> -p <password> -r <repo> [-t <tag>] [-s <sif_name>] [-d <DIR_BASE>] [-f]
+  cat <<EOF
+Usage: $0 -R <registry> -u <user> -o <org> -p <password> -r <repo> [-t <tag>] [-s <sif_name>] [-d <dir_base>] [-f]
   -R, --registry   Registry to pull from ('docker' or 'ghcr'; defaults to 'ghcr')
   -u, --user       Username for GitHub or Docker (required)
-  -o, --org        Organisation or user override (defaults to \$LOGIN_USER)
+  -o, --org        Organisation or user override (defaults to \$login_user)
   -p, --password   Password or token (for GHCR defaults to GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT)
   -r, --repo       Repository name (defaults to current directory basename)
-  -i, --image      Image name (defaults to <repo>-<branch>, and then <repo> if <repo>-<branch> does not exist)          
+  -i, --image      Image name (string or array; defaults to <repo>-<branch>, then <repo>)
   -s, --sif        SIF filename (with or without .sif)
   -t, --tag        Tag (defaults to 'latest')
-  -n, --no-append  Do not append branch or tag to SIF name
-  -d, --directory  Directory for storing the SIF (defaults to first cache dir)
+  -d, --dir_base   Directory for storing the SIF (defaults to cache dirs)
   -f, --force      Force download & overwrite existing SIF
   -h, --help       Show this help and exit
 EOF
@@ -25,49 +23,47 @@ EOF
 sif_specified=false
 sif_file=""
 branch="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
-image=""
-BRANCH="-$branch"
-NO_APPEND=false
-TAG="latest"
-TAG_SET=false
-FORCE=false
-DIR_BASE=""
-REGISTRY="ghcr"
-ORG=""
-REPO="$(basename "$PWD")"
-LOGIN_USER=""
-PASSWORD=""
-
+# image may be either string or array
+image=()
+tag="latest"
+tag_set=false
+force=false
+dir_base=""
+registry="ghcr"
+org=""
+repo="$(basename "$PWD")"
+login_user=""
+password=""
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -R|--registry)   REGISTRY="$2";   shift 2 ;;
-      -u|--user)       LOGIN_USER="$2"; shift 2 ;;
-      -o|--org)        ORG="$2";        shift 2 ;;
-      -p|--password)   PASSWORD="$2";   shift 2 ;;
-      -r|--repo)       REPO="$2";       shift 2 ;;
-      -i|--image)      image="$2";      shift 2 ;;
+      -R|--registry) registry="$2"; shift 2 ;;
+      -u|--user)     login_user="$2"; shift 2 ;;
+      -o|--org)      org="$2";        shift 2 ;;
+      -p|--password) password="$2";   shift 2 ;;
+      -r|--repo)     repo="$2";       shift 2 ;;
+      -i|--image)
+        # Accept comma-separated or space-separated list
+        IFS=, read -r -a image <<<"$2"
+        shift 2
+        ;;
       -s|--sif)
         sif_specified=true
         sif_file="${2%.sif}.sif"
         shift 2
         ;;
       -t|--tag)
-        TAG="$2"
-        TAG_SET=true
+        tag="$2"
+        tag_set=true
         shift 2
         ;;
-      -n|--no-append)
-        NO_APPEND=true
-        shift
-        ;;
-      -d|--directory)
-        DIR_BASE="$2"
+      -d|--dir_base)
+        dir_base="$2"
         shift 2
         ;;
       -f|--force)
-        FORCE=true
+        force=true
         shift
         ;;
       -h|--help)
@@ -82,282 +78,199 @@ parse_args() {
 }
 
 validate_required_params() {
-  if [[ -z "$LOGIN_USER" && -z "$ORG" ]]; then
+  if [[ -z "$login_user" && -z "$org" ]]; then
     echo "Error: either --user or --org must be specified." >&2
     usage
+  fi
+}
+
+get_hostname() {
+  local r="$registry"
+  if [[ "$r" == "docker" ]]; then
+    registry_host="docker.io"
+  elif [[ "$r" == "ghcr" ]]; then
+    registry_host="ghcr.io"
+  else
+    echo "Error: Unsupported registry '$r'" >&2
     exit 1
   fi
 }
 
-get_image() {
-  if [[ -z "$image" ]]; then
-    image=( "${REPO,,}-${branch,,}" "${REPO,,}" )
-  fi
-}
-
-# --- choose registry hostname ---
-get_hostname() {
-  if [[ "$REGISTRY" == "docker" ]]; then
-      REGISTRY_HOSTNAME="docker.io"
-  elif [[ "$REGISTRY" == "ghcr" ]]; then
-      REGISTRY_HOSTNAME="ghcr.io"
-  else
-      echo "Error: Unsupported registry '$REGISTRY'" >&2
-      exit 1
-  fi
-}
-
-# --- grab GHCR token into $PASSWORD if needed ---
 get_ghcr_token() {
-  if [[ "$REGISTRY" == "ghcr" && -z "$PASSWORD" ]]; then
-      PASSWORD="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
+  if [[ "$registry" == "ghcr" && -z "$password" ]]; then
+    password="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
   fi
 }
 
-choose_image() {
-  local org="${ORG:-$LOGIN_USER}"
-  org="${org,,}"
-  local repo
-  local candidate_uri
+# Populate image array if user passed a single string or nothing
+get_image_candidates() {
+  if [[ ${#image[@]} -eq 0 ]]; then
+    image=( "${repo,,}-${branch,,}" "${repo,,}" )
+  fi
+}
 
-  for repo in "${image[@]}"; do
-    candidate_uri="docker://${REGISTRY_HOSTNAME}/${org}/${repo}:${TAG}"
-    if image_exists "$candidate_uri"; then
-      echo "$candidate_uri"
+# Try each candidate until the manifest exists
+choose_image() {
+  local src_org="${org:-$login_user}"
+  src_org="${src_org,,}"
+  local cand uri
+  for cand in "${image[@]}"; do
+    uri="docker://${registry_host}/${src_org}/${cand}:${tag}"
+    if image_exists "$uri"; then
+      echo "$uri"
       return 0
     fi
   done
-
-  # If we get here, none exist
   return 1
 }
 
-# --- Returns 0 if remote manifest exists, nonzero otherwise ---
+# Only fetch manifest, never pull layers
 image_exists() {
   local uri="$1"
-  local host path_tag path tag
+  local h p_t p t auth_header
+  h="${uri#docker://}"
+  h="${h%%/*}"
+  p_t="${uri#docker://$h/}"
+  p="${p_t%:*}"
+  t="${p_t##*:}"
 
-  # strip prefix and split
-  host="${uri#docker://}"            # e.g. ghcr.io/org/repo:tag
-  host="${host%%/*}"                 # e.g. ghcr.io
-  path_tag="${uri#docker://$host/}"  # e.g. org/repo:tag
-  path="${path_tag%:*}"              # e.g. org/repo
-  tag="${path_tag##*:}"              # e.g. tag
-
-  # build curl auth header if we have a token
-  local auth=""
-  if [[ -n "$PASSWORD" ]]; then
-    auth=(-H "Authorization: Bearer $PASSWORD")
+  auth_header=()
+  if [[ -n "$password" ]]; then
+    auth_header=( -H "Authorization: Bearer $password" )
   fi
 
   curl --fail -sSL \
     -H "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json" \
-    "${auth[@]}" \
-    "https://$host/v2/$path/manifests/$tag" \
+    "${auth_header[@]}" \
+    "https://$h/v2/$p/manifests/$t" \
     >/dev/null 2>&1
 }
 
-# Usage: sif_filename_from_uri "$selected_uri" "$REPO" "$branch"
+# Derive sif filename from the image repo part
 sif_filename_from_uri() {
-  local selected_uri="$1"
-  local REPO="$2"
-  local branch="$3"
-
-  # Lowercase REPO and branch for consistent comparison
-  local repo_lc="${REPO,,}"
-  local branch_lc="${branch,,}"
-
-  # Extract repo part from URI
-  local host path_tag repo
-  host="${selected_uri#docker://}"
-  host="${host%%/*}"
-  path_tag="${selected_uri#docker://$host/}"   # org/repo:tag
-  repo="${path_tag%:*}"                        # org/repo
-  repo="${repo##*/}"                           # repo
-
-  # Determine SIF filename
-  if [[ "$repo" == "${repo_lc}-${branch_lc}" ]]; then
-    echo "${repo}.sif"
+  local sel_uri="$1" base_repo br repo_part
+  base_repo="${2,,}"
+  br="${3,,}"
+  repo_part="${sel_uri#*://*/}"    # strip scheme & host => org/repo:tag
+  repo_part="${repo_part%%:*}"     # org/repo
+  repo_part="${repo_part##*/}"     # repo
+  if [[ "$repo_part" == "$base_repo-$br" ]]; then
+    echo "${repo_part}.sif"
   else
-    echo "${repo_lc}.sif"
+    echo "${base_repo}.sif"
   fi
-}
-
-get_sif_filename() {
-  if [[ -z "$1" ]]; then
-    # If no SIF file specified, compute default based on repo and branch
-    sif_file=$(sif_filename_from_uri "$2" "$3" "$4")
-  else
-      echo "$1"
-  fi
-}
-
-
-# --- login via apptainer (if creds) ---
-login() {
-  if [[ -n "$PASSWORD" && -n "$LOGIN_USER" ]]; then
-      echo "Logging into $REGISTRY_HOSTNAME as $LOGIN_USER"
-      echo "$PASSWORD" \
-        | apptainer registry login -u "$LOGIN_USER" --password-stdin \
-          "docker://$REGISTRY_HOSTNAME"
-  else
-      echo "Skipping registry login (no credentials provided)"
-  fi  
 }
 
 get_dir() {
-  if [[ -n "$directory" ]]; then
-    path_final="$directory"
-  elif [[ -n "$APPTAINER_CACHE_DIR" ]]; then
-    path_final="$APPTAINER_CACHE_DIR"
+  local d
+  if [[ -n "$dir_base" ]]; then
+    d="$dir_base"
+  elif [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then
+    d="$APPTAINER_CACHE_DIR"
   elif [[ -d "/scratch/$USER" ]]; then
-    path_sub=".local/share/apptainer/sif"
-    if [[ -d "/scratch/$USER" ]]; then
-      path_base="/scratch/$USER"
-    else
-      path_base="$HOME"
-    fi
-    path_final="$path_base/$path_sub"
-  fi
-  mkdir -p "$path_final"
-  echo "$path_final"
-}
-
-# --- Function to build Apptainer image ---
-build_apptainer() {
-    local org="${ORG:-$LOGIN_USER}"
-    org="${org,,}"
-    local repo="${REPO,,}"
-    local uri=$(choose_image) || {
-        echo "Error: No suitable image found for $org/$repo with tag $TAG" >&2
-        exit 1
-    }
-
-    sif_file=$(get_sif_filename "$sif_file" "$uri" "$REPO" "$branch")
-
-    if [[ "$force" == "false" && apptainer-exists -s "$sif_file" ]]; then
-        echo "SIF file '$sif_file' already exists. Use --force to overwrite."
-        exit 0
-    fi
-
-    login
-
-    dir=$(get_dir)
-
-    echo "Building Apptainer image '$sif_file' from Docker image '$uri'"
-    path_sif="$dir/$sif_file"
-    mkdir -p "$(dirname "$path_sif")"
-    if [[ "$FORCE" == true ]]; then
-        apptainer build --force "$path_sif" "$uri"
-    else
-        apptainer build "$path_sif" "$uri"
-    fi
-    echo "Apptainer build process completed for '$sif_file'"
-}
-
-get_current_branch() {
-  if ! git rev-parse --is-inside-work-tree &>/dev/null \
-     || ! git symbolic-ref --quiet HEAD &>/dev/null; then
-    echo main
+    d="/scratch/$USER/.local/share/apptainer/sif"
   else
-    git symbolic-ref --short HEAD | tr '/' '_'
+    d="$HOME/.local/share/apptainer/sif"
+  fi
+  mkdir -p "$d"
+  echo "$d"
+}
+
+login() {
+  if [[ -n "$password" && -n "$login_user" ]]; then
+    echo "Logging into $registry_host as $login_user"
+    echo "$password" | apptainer registry login -u "$login_user" --password-stdin "docker://$registry_host"
+  else
+    echo "Skipping registry login (no credentials)"
   fi
 }
 
+get_docker_digest() {
+  local uri="$1"
+  local host path_tag path tag manifest digest auth_header
 
+  # split out host, path, and tag
+  host="${uri#docker://}"
+  host="${host%%/*}"
+  path_tag="${uri#docker://$host/}"
+  path="${path_tag%:*}"
+  tag="${path_tag##*:}"
 
+  # set up auth if needed
+  auth_header=()
+  if [[ -n "$password" ]]; then
+    auth_header=( -H "Authorization: Bearer $password" )
+  fi
+
+  # fetch only the manifest JSON
+  manifest="$(curl -sSL \
+    "${auth_header[@]}" \
+    -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+    "https://$host/v2/$path/manifests/$tag")"
+
+  # extract the config.digest field
+  digest="$(jq -r '.config.digest // empty' <<<"$manifest")"
+  if [[ -z "$digest" ]]; then
+    echo "Error: could not extract digest for $uri" >&2
+    return 1
+  fi
+
+  echo "$digest"
+}
+
+build_apptainer() {
+  local sel_uri="$1"
+  local sif_file="$2"
+  local out_dir
+  local digest
+
+  echo "Building Apptainer image '$sif_file' from Docker image '$sel_uri'"
+
+  # grab the digest (or fail early)
+  digest="$(get_docker_digest "$sel_uri")" || exit 1
+
+  out_dir=$(get_dir)
+  mkdir -p "$out_dir"
+
+  # build with the digest label
+  apptainer build \
+    ${force:+--force} \
+    --label "docker.source.digest=$digest" \
+    "$out_dir/$sif_file" \
+    "$sel_uri"
+
+  echo "Completed: $sif_file"
+}
 
 main() {
   parse_args "$@"
   validate_required_params
-  get_image
+  get_hostname
+  get_ghcr_token
+  get_image_candidates
+
+  # 1. pick the image
+  selected_uri="$(choose_image)" || {
+    echo "Error: no matching image for ${org:-$login_user}/$repo:$tag" >&2
+    exit 1
+  }
+  echo "Found container image: $selected_uri"
+
+  # 2. sif filename
+  if ! $sif_specified; then
+    sif_file="$(sif_filename_from_uri "$selected_uri" "$repo" "$branch")"
+  fi
+  echo "Will use SIF file: $sif_file"
+
+  # 4. existing SIF?
+  if [[ "$force" != true ]] && apptainer-exists -q -s "$sif_file"; then
+    echo "SIF '$sif_file' already present (use --force to overwrite)."
+    exit 0
+  fi
+
+  # 5. login & build
+  login
+  build_apptainer "$selected_uri" "$sif_file"
 }
 
 main "$@"
-
-# 3) Compute default SIF_NAME if needed
-if [ -z "$SIF_NAME" ]; then
-    if [ "$NO_APPEND" = true ]; then
-        SIF_NAME="${REPO,,}.sif"
-    else
-        if [ "$TAG_SET" == "true" ]; then
-            SIF_NAME="${REPO,,}-${BRANCH}-${TAG,,}.sif"
-        else
-            SIF_NAME="${REPO,,}-${BRANCH}.sif"
-        fi
-    fi
-    SIF_NAME=$(echo "$SIF_NAME" | tr -d '[:space:]')
-fi
-
-# 4) Check if the SIF already exists anywhere
-# Build the args for apptainer-exists:
-exists_args=( -s "$SIF_NAME" )
-if [[ -n "$DIR_BASE" ]]; then
-  exists_args+=( -d "$DIR_BASE" )
-fi
-
-# Now call it. On success it prints “Found: /path/to/xyz.sif”
-if found_line=$(apptainer-exists "${exists_args[@]}"); then
-  # extract just the path
-  existing_path=${found_line#Found: }
-  echo "⇒ SIF already present at: $existing_path"
-  if ! $FORCE; then
-    echo "Use --force if you really want to re-pull."
-    exit 0
-  else
-    echo "Overwriting because --force was specified."
-  fi
-fi
-
-# 5) Decide where to put the new SIF
-#
-if [[ -n "$DIR_BASE" ]]; then
-  target_dir="$DIR_BASE"
-else
-  mapfile -t base_dirs < <(apptainer_common_get_cache_dirs)
-  target_dir="${base_dirs[0]}"
-fi
-mkdir -p "$target_dir/logs/$REPO"
-SIF_FILE="$target_dir/$SIF_NAME"
-
-# Create the base directory and log directory if they don't exist
-LOG_DIR="$DIR_BASE/logs/$REPO"
-mkdir -p "$LOG_DIR"
-
-# Full path for the SIF file
-SIF_FILE="$DIR_BASE/${SIF_NAME,,}"
-
-# --- echo out all the options used ---
-echo "Options:"
-echo "  Registry:     $REGISTRY"
-echo "  User:         $LOGIN_USER"
-echo "  Organisation: ${ORG:-$LOGIN_USER}"
-echo "  Repository:   $REPO"
-echo "  Tag:          $TAG"
-echo "  SIF Name:     $SIF_NAME"
-echo "  Directory:    ${DIR_BASE:-<default cache dir>}"
-echo "  Force:        $FORCE"
-echo "  Target SIF:   $SIF_FILE"
-echo
-
-# --- simple error handler ---
-error_handler() {
-    echo "Error: something went wrong during script execution." >&2
-    exit 1
-}
-trap 'error_handler' ERR
-
-# --- bail if SIF already exists and we're not forcing ---
-if [[ -f "$SIF_FILE" && "$FORCE" != true ]]; then
-    echo "Error: SIF file '$SIF_FILE' already exists. Use --force to overwrite." >&2
-    exit 1
-fi
-
-
-
-
-
-# Run the build function
-build_apptainer
-
-echo "Apptainer image '$SIF_FILE' created successfully"
