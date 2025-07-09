@@ -33,7 +33,10 @@ enable_debug() {
 }
 
 debug_log() {
-  [[ "$debug" == true ]] && printf '[DEBUG] %s\n' "$*" >&2
+  if [[ "$debug" == true ]]; then
+    printf '[DEBUG] %s\n' "$*" >&2
+  fi
+  return 0
 }
 
 # Determine org/user from args or Git remote
@@ -81,21 +84,35 @@ parse_args() {
   debug_log "Parsing arguments: $*"
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -R|--registry) registry="$2"; debug_log "registry=$registry"; shift 2;;
-      -u|--user)     login_user="$2"; debug_log "login_user=$login_user"; shift 2;;
-      -o|--org)      org="$2"; debug_log "org=$org"; shift 2;;
-      -p|--password) password="$2"; debug_log "password set"; shift 2;;
-      -r|--repo)     repo="$2"; debug_log "repo=$repo"; shift 2;;
-      -i|--image)    IFS=, read -r -a image <<<"$2"; debug_log "images=${image[*]}"; shift 2;;
-      -s|--sif)      sif_specified=true; sif_file="${2%.sif}.sif"; debug_log "sif_file=$sif_file"; shift 2;;
-      -t|--tag)      tag="$2"; tag_set=true; debug_log "tag=$tag"; shift 2;;
-      -d|--dir_base) dir_base="$2"; debug_log "dir_base=$dir_base"; shift 2;;
-      -f|--force)    force="--force"; debug_log "force enabled"; shift;;
-      -D|--debug)    debug=true; debug_log "debug mode on"; shift;;
+      -R|--registry) registry="$2"; shift 2;;
+      -u|--user)     login_user="$2"; shift 2;;
+      -o|--org)      org="$2"; shift 2;;
+      -p|--password) password="$2"; shift 2;;
+      -r|--repo)     repo="$2"; shift 2;;
+      -i|--image)    IFS=, read -r -a image <<<"$2"; shift 2;;
+      -s|--sif)      sif_specified=true; sif_file="${2%.sif}.sif"; shift 2;;
+      -t|--tag)      tag="$2"; tag_set=true; shift 2;;
+      -d|--dir_base) dir_base="$2"; shift 2;;
+      -f|--force)    force="--force"; shift;;
+      -D|--debug)    debug=true; shift;;
       -h|--help)     usage;;
       *) die "Unknown option: $1";;
     esac
   done
+}
+
+log_args() {
+  debug_log "registry=$registry"
+  debug_log "login_user=$login_user"
+  debug_log "org=$org"
+  debug_log "repo=$repo"
+  debug_log "image=${image[*]}"
+  debug_log "sif_file=$sif_file"
+  debug_log "tag=$tag"
+  debug_log "tag_set=$tag_set"
+  debug_log "dir_base=$dir_base"
+  debug_log "force=$force"
+  debug_log "debug=$debug"
 }
 
 validate_required_params() {
@@ -256,9 +273,10 @@ get_docker_digest() {
 }
 
 main() {
-  enable_debug
-  ensure_prerequisites
   parse_args "$@"
+  enable_debug
+  log_args
+  ensure_prerequisites
   validate_required_params
   get_hostname
   get_ghcr_token
