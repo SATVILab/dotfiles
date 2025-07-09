@@ -30,7 +30,7 @@ enable_debug() {
 
 debug_log() {
   if [[ "$debug" == true ]]; then
-    printf '[DEBUG] %s\n' "$*"
+    printf '[DEBUG] %s\n' "$*" >&2
   fi
 }
 
