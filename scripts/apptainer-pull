@@ -16,7 +16,7 @@ Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i
   -o, --org        Organisation or owner override (defaults to repo remote owner)
   -p, --password   Password or token (GHCR reads GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT if unset)
   -r, --repo       Repository name (defaults to current directory basename)
-  -i, --image      Image name(s), comma‑separated (defaults to <repo>-<branch>, then <repo>)
+  -i, --image      Image name(s), comma-separated (defaults to <repo>-<branch>, then <repo>)
   -s, --sif        SIF filename (with or without .sif)
   -t, --tag        Tag (defaults to 'latest')
   -d, --dir_base   Directory for storing the SIF (defaults to cache dirs)
@@ -148,6 +148,25 @@ get_current_branch() {
   fi
 }
 
+# Select the first valid image
+choose_image() {
+  debug_log "Choosing image from candidates"
+  local src_org cand uri
+  src_org=$(determine_org)
+  debug_log "using org/user=$src_org"
+  src_org="${src_org,,}"
+  for cand in "${image[@]}"; do
+    uri="docker://$registry_host/$src_org/$cand:$tag"
+    debug_log "testing $uri"
+    if image_exists "$uri"; then
+      debug_log "chosen $uri"
+      echo "$uri"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Use basic auth and HEAD probe for existence
 image_exists() {
   debug_log "Checking existence of $1"
@@ -187,8 +206,7 @@ sif_filename_from_uri() {
   base="${2,,}"
   br=$(get_current_branch)
   part=${sel_uri#*://*/}; part=${part%%:*}; part=${part##*/}
-  if [[ "$part" == "$base-$br" ]]; then
-    echo "$part.sif" else echo "$base.sif"; fi
+  if [[ "$part" == "$base-$br" ]]; then echo "$part.sif"; else echo "$base.sif"; fi
 }
 
 get_dir() {
@@ -250,14 +268,12 @@ main() {
   selected_uri=$(choose_image) || die "No matching image for $(determine_org)/$repo:$tag"
   echo "Found container image: $selected_uri"
 
-  if ! \$sif_specified; then
+  if ! $sif_specified; then
     sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
   fi
   echo "Will use SIF file: $sif_file"
 
-  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then
-    echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0
-  fi
+  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0; fi
 
   build_apptainer "$selected_uri" "$dir_base" "$sif_file"
 }
