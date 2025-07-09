@@ -76,18 +76,82 @@ parse_args() {
   done
 }
 
-# Determine owner rom args or Git remote
-get_owner() {
-  if [[ -z "$owner" ]]; then
-    local remote
-    remote=$(git config --get remote.origin.url 2>/dev/null) || remote=""
-    if [[ "$remote" =~ github\.com[:/]+([^/]+)/ ]]; then
-      owner="${BASH_REMATCH[1]}"
-    else
-      die "Cannot determine owner from git remote; please specify -o."
-    fi
+# Determine registry host
+get_hostname() {
+  debug_log "Determining registry host for $registry"
+  case "$registry" in
+    docker) registry_host="docker.io" ;;
+    ghcr)   registry_host="ghcr.io" ;;
+    *)      die "Unsupported registry '$registry'" ;;
+  esac
+  debug_log "registry_host=$registry_host"
+}
+
+# Populate $password for GHCR if needed
+get_ghcr_token() {
+  debug_log "Fetching GHCR token if needed"
+  if [[ "$registry" == "ghcr" && -z "$password" ]]; then
+    password="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
+    debug_log "GHCR token ${password:+retrieved}"
   fi
 }
+
+# Top-level owner getter
+get_owner() {
+  debug_log "Determining owner/namespace"
+  if [[ -n "$owner" ]]; then
+    debug_log "  → owner explicitly set to '$owner'"
+    return
+  fi
+
+  # 1) Try from token (GHCR only)
+  if [[ "$registry" == "ghcr" ]]; then
+    owner="$(get_owner_from_token)"
+    debug_log "  → from token: '${owner:-<none>}'"
+  fi
+
+  # 2) Fall back to Git remote
+  if [[ -z "$owner" ]]; then
+    owner="$(get_owner_from_remote)"
+    debug_log "  → from git remote: '${owner:-<none>}'"
+  fi
+
+  # 3) Give up if still empty
+  if [[ -z "$owner" ]]; then
+    die "Cannot determine owner; please specify with -o/--owner."
+  fi
+}
+
+# Try to fetch the username via GitHub API
+get_owner_from_token() {
+  if [[ -n "$password" ]]; then
+    curl -s -H "Authorization: token $password" \
+      https://api.github.com/user \
+    | grep '"login"' \
+    | sed -E 's/.*"login": "([^"]+)".*/\1/'
+  fi
+}
+
+# Parse ‘owner’ from `git remote origin` URL
+get_owner_from_remote() {
+  local remote url owner
+  url="$(git config --get remote.origin.url 2>/dev/null)" || return
+  if [[ "$url" =~ github\.com[:/]+([^/]+)/ ]]; then
+    owner="${BASH_REMATCH[1]}"
+    # strip trailing “.git” if present
+    echo "${owner%.git}"
+  fi
+}
+
+# (Optional) login_user detection for GHCR
+get_login_user() {
+  debug_log "Determining login_user"
+  if [[ -z "$login_user" && "$registry" == "ghcr" && -n "$GITHUB_USER" ]]; then
+    login_user="$GITHUB_USER"
+    debug_log "  → login_user set from \$GITHUB_USER: $login_user"
+  fi
+}
+
 
 log_args() {
   debug_log "registry=$registry"
@@ -100,33 +164,6 @@ log_args() {
   debug_log "dir_base=$dir_base"
   debug_log "force=$force"
   debug_log "debug=$debug"
-}
-
-get_hostname() {
-  debug_log "Determining registry host for $registry"
-  case "$registry" in
-    docker) registry_host="docker.io";;
-    ghcr)   registry_host="ghcr.io";;
-    *) die "Unsupported registry '$registry'";;
-  esac
-  debug_log "registry_host=$registry_host"
-}
-
-get_ghcr_token() {
-  debug_log "Fetching GHCR token if needed"
-  if [[ "$registry" == "ghcr" && -z "$password" ]]; then
-    password="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
-    debug_log "GHCR token ${password:+retrieved}";
-  fi
-}
-
-get_login_user() {
-  debug_log "Determining login user"
-  if [[ -z "$login_user" ]]; then
-    if [[ "$registry" == "ghcr" && -n "$GITHUB_USER" ]]; then 
-      login_user="$GITHUB_USER"
-    fi
-  fi
 }
 
 # Login before any registry probing
@@ -206,10 +243,10 @@ main() {
   parse_args "$@"
   ensure_prerequisites
   get_hostname
+  get_ghcr_token
   get_owner
   get_login_user
   log_args
-  get_ghcr_token
   login
   get_image_candidates
   debug_log "Image candidates: ${image[*]}"
