@@ -97,6 +97,7 @@ parse_args() {
       -d|--dir_base) dir_base="$2"; shift 2;;
       -f|--force)    force="--force"; shift;;
       -D|--debug)    debug=true; shift;;
+      -t|--trace)    trace=true; set -x; shift;;
       -h|--help)     usage;;
       *) die "Unknown option: $1";;
     esac
