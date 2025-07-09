@@ -174,49 +174,6 @@ get_current_branch() {
   fi
 }
 
-# Select the first valid image
-choose_image() {
-  debug_log "Choosing image from candidates"
-  local src_org cand uri
-  src_org=$(determine_org)
-  debug_log "using org/user=$src_org"
-  src_org="${src_org,,}"
-  for cand in "${image[@]}"; do
-    uri="docker://$registry_host/$src_org/$cand:$tag"
-    debug_log "testing $uri"
-    if image_exists "$uri"; then
-      debug_log "chosen $uri"
-      echo "$uri"
-      return 0
-    fi
-  done
-  return 1
-}
-
-# Use basic auth and HEAD probe for existence
-image_exists() {
-  debug_log "Checking existence of $1"
-  local uri="$1" host repo_tag repo tag status auth_opts url
-  host=${uri#docker://}; host=${host%%/*}
-  repo_tag=${uri#docker://$host/}
-  repo=${repo_tag%:*}
-  tag=${repo_tag##*:}
-  auth_opts=()
-  if [[ -n "$login_user" && -n "$password" ]]; then
-    auth_opts=(-u "$login_user:$password")
-  fi
-  url="https://$host/v2/$repo/manifests/$tag"
-  debug_log "HEAD $url with opts: ${auth_opts[*]}"
-  status=$(curl -sSLI -o /dev/null -w '%{http_code}' "${auth_opts[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "$url")
-  debug_log "Manifest check HTTP/$status for $repo:$tag"
-  case "$status" in
-    200) return 0;;
-    401) die "401 Unauthorized—check your credentials";;
-    404) return 1;;
-    *) die "Registry returned $status for $repo:$tag";;
-  esac
-}
-
 sif_filename_from_uri() {
   debug_log "Deriving SIF filename from $1"
   local sel_uri="$1" base br part
@@ -283,14 +240,34 @@ main() {
   login
   get_image_candidates
   debug_log "Image candidates: ${image[*]}"
-  selected_uri=$(choose_image) || die "No matching image for $(determine_org)/$repo:$tag"
-  echo "Found container image: $selected_uri"
-  [[ "$sif_specified" == true ]] || sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
-  echo "Will use SIF file: $sif_file"
-  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then
-    echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0
+
+  # Try each image candidate in turn; the first one that builds wins
+  local success=0
+  for cand in "${image[@]}"; do
+    src_org=$(determine_org); src_org="${src_org,,}"
+    uri="docker://$registry_host/$src_org/$cand:$tag"
+    # derive the sif filename for this URI
+    sif_candidate=$(sif_filename_from_uri "$uri" "$repo")
+    echo "Attempting to build from: $uri → $sif_candidate"
+
+    # disable errexit so we can catch failures
+    set +e
+    build_apptainer "$uri" "$dir_base" "$sif_candidate"
+    rc=$?
+    set -e
+
+    if [[ $rc -eq 0 ]]; then
+      success=1
+      break
+    else
+      echo "[WARN] build from $uri failed (exit $rc), trying next candidate..."
+    fi
+  done
+
+  if [[ $success -eq 0 ]]; then
+    die "No matching image could be pulled for $(determine_org)/$repo:$tag"
   fi
-  build_apptainer "$selected_uri" "$dir_base" "$sif_file"
+  echo "Successfully built SIF: $sif_candidate"
 }
 
 main "$@"
