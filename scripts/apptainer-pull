@@ -22,15 +22,9 @@ Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i
   -d, --dir_base   Directory to store SIF (defaults to cache dirs)
   -f, --force      Force download & overwrite existing SIF
   -D, --debug      Enable debug output
-  -t, --trace      Enable trace output
   -h, --help       Show this help and exit
 EOF
   exit 1
-}
-
-# turn on optional debug
-enable_trace() {
-  [[ "$trace" == true ]] && set -x
 }
 
 debug_log() {
@@ -79,7 +73,6 @@ repo="$(basename "$PWD")"
 login_user=""
 password=""
 debug=false
-trace=false
 
 # Parse CLI args
 parse_args() {
@@ -97,7 +90,6 @@ parse_args() {
       -d|--dir_base) dir_base="$2"; shift 2;;
       -f|--force)    force="--force"; shift;;
       -D|--debug)    debug=true; shift;;
-      -t|--trace)    trace=true; set -x; shift;;
       -h|--help)     usage;;
       *) die "Unknown option: $1";;
     esac
@@ -218,7 +210,6 @@ build_apptainer() {
 
 main() {
   parse_args "$@"
-  enable_trace
   log_args
   ensure_prerequisites
   validate_required_params
