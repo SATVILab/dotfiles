@@ -19,6 +19,13 @@ EOF
   exit 1
 }
 
+ensure_jq() {
+  command -v jq >/dev/null || {
+    echo "Error: jq is required to extract manifest digests." >&2
+    exit 1
+  }
+}
+
 # ——— Defaults —————————————————
 sif_specified=false
 sif_file=""
@@ -220,21 +227,25 @@ get_docker_digest() {
 
 build_apptainer() {
   local sel_uri="$1"
-  local sif_file="$2"
+  local dir_base="${2:-}"
+  local sif_file="$3"
   local out_dir
   local digest
 
   echo "Building Apptainer image '$sif_file' from Docker image '$sel_uri'"
 
   # grab the digest (or fail early)
-  digest="$(get_docker_digest "$sel_uri")" || exit 1
+  if ! digest="$(get_docker_digest "$sel_uri")"; then
+    echo "Failed to fetch digest, aborting." >&2
+    exit 1
+  fi
 
-  out_dir=$(get_dir)
+  out_dir=$(get_dir "$dir_base")
   mkdir -p "$out_dir"
 
   # build with the digest label
   apptainer build \
-    ${force:+--force} \
+    "${force:+--force}" \
     --label "docker.source.digest=$digest" \
     "$out_dir/$sif_file" \
     "$sel_uri"
@@ -243,6 +254,7 @@ build_apptainer() {
 }
 
 main() {
+  ensure_jq
   parse_args "$@"
   validate_required_params
   get_hostname
@@ -270,7 +282,7 @@ main() {
 
   # 5. login & build
   login
-  build_apptainer "$selected_uri" "$sif_file"
+  build_apptainer "$selected_uri" "$dir_base" "$sif_file"
 }
 
 main "$@"
