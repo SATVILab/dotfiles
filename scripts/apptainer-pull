@@ -10,17 +10,16 @@ die() {
 
 usage() {
   cat <<EOF
-Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i <images>] [-t <tag>] [-s <sif>] [-d <dir_base>] [-f] [-D]
+Usage: $0 [-R <registry>] (-u <user> | -o <owner>) [-p <password>] [-i <images>] [-t <tag>] [-f <file>] [-d <dir_base>] [-F] [-D] [-h]
   -R, --registry   Registry ('docker' or 'ghcr'; defaults to 'ghcr')
-  -u, --user       Username for login (required for private images)
-  -o, --org        Org/owner override (defaults to Git remote owner)
-  -p, --password   Password/token (GHCR reads GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT if unset)
-  -r, --repo       Repo name (defaults to current directory basename)
-  -i, --image      Image name(s), comma-separated (defaults to <repo>-<branch>, then <repo>)
-  -s, --sif        SIF filename (with or without .sif)
+  -u, --user       Username for login (required for private images; defaults to \$GITHUB_USER for GHCR)
+  -o, --owner      Owner override (defaults to Git remote owner)
+  -p, --password   Password/token (GHCR reads \$GH_TOKEN, \$GITHUB_TOKEN or \$GITHUB_PAT if unset)
+  -i, --image      Image name(s), comma-separated (defaults to <cwd_basename>-<branch>, then <cwd_basename>)
   -t, --tag        Tag (defaults to 'latest')
+  -f, --file       Output SIF filename (appends .sif if not specified)
   -d, --dir_base   Directory to store SIF (defaults to cache dirs)
-  -f, --force      Force download & overwrite existing SIF
+  -F, --force      Force download & overwrite existing SIF
   -D, --debug      Enable debug output
   -h, --help       Show this help and exit
 EOF
@@ -34,42 +33,24 @@ debug_log() {
   return 0
 }
 
-# Determine org/user from args or Git remote
-determine_org() {
-  if [[ -n "$org" ]]; then
-    echo "$org"
-  elif [[ -n "$login_user" ]]; then
-    echo "$login_user"
-  else
-    local remote
-    remote=$(git config --get remote.origin.url 2>/dev/null) || remote=""
-    if [[ "$remote" =~ github\.com[:/]+([^/]+)/ ]]; then
-      echo "${BASH_REMATCH[1]}"
-    else
-      die "Cannot determine org/user from git remote; please specify -u or -o."
-    fi
-  fi
-}
-
 # Ensure required commands exist
 ensure_prerequisites() {
   debug_log "Running ensure_prerequisites"
-  for cmd in curl git apptainer jq; do
+  for cmd in curl git apptainer; do
     command -v "$cmd" >/dev/null || die "'$cmd' not found; please install it."
   done
 }
 
 # Defaults
-sif_specified=false
-sif_file=""
+file=""
 image=()
 tag="latest"
-tag_set=false
 force=""
 dir_base=""
 registry="ghcr"
-org=""
-repo="$(basename "$PWD")"
+owner=""
+image_base="$(basename "$PWD")"
+image_base="${image_base,,}"
 login_user=""
 password=""
 debug=false
@@ -81,14 +62,13 @@ parse_args() {
     case "$1" in
       -R|--registry) registry="$2"; shift 2;;
       -u|--user)     login_user="$2"; shift 2;;
-      -o|--org)      org="$2"; shift 2;;
+      -o|--owner)    owner="$2"; shift 2;;
       -p|--password) password="$2"; shift 2;;
-      -r|--repo)     repo="$2"; shift 2;;
       -i|--image)    IFS=, read -r -a image <<<"$2"; shift 2;;
-      -s|--sif)      sif_specified=true; sif_file="${2%.sif}.sif"; shift 2;;
-      -t|--tag)      tag="$2"; tag_set=true; shift 2;;
+      -f|--file)     file="${2%.sif}.sif"; shift 2;;
+      -t|--tag)      tag="$2"; shift 2;;
       -d|--dir_base) dir_base="$2"; shift 2;;
-      -f|--force)    force="--force"; shift;;
+      -F|--force)    force="--force"; shift;;
       -D|--debug)    debug=true; shift;;
       -h|--help)     usage;;
       *) die "Unknown option: $1";;
@@ -96,25 +76,30 @@ parse_args() {
   done
 }
 
+# Determine owner rom args or Git remote
+get_owner() {
+  if [[ -z "$owner" ]]; then
+    local remote
+    remote=$(git config --get remote.origin.url 2>/dev/null) || remote=""
+    if [[ "$remote" =~ github\.com[:/]+([^/]+)/ ]]; then
+      owner="${BASH_REMATCH[1]}"
+    else
+      die "Cannot determine owner from git remote; please specify -o."
+    fi
+  fi
+}
+
 log_args() {
   debug_log "registry=$registry"
   debug_log "login_user=$login_user"
-  debug_log "org=$org"
-  debug_log "repo=$repo"
+  debug_log "owner=$owner"
+  debug_log "image_base=$image_base"
   debug_log "image=${image[*]}"
-  debug_log "sif_file=$sif_file"
+  debug_log "file=$file"
   debug_log "tag=$tag"
-  debug_log "tag_set=$tag_set"
   debug_log "dir_base=$dir_base"
   debug_log "force=$force"
   debug_log "debug=$debug"
-}
-
-validate_required_params() {
-  debug_log "Validating required parameters"
-  if [[ -z "${login_user}${org}" ]]; then
-    usage
-  fi
 }
 
 get_hostname() {
@@ -135,6 +120,15 @@ get_ghcr_token() {
   fi
 }
 
+get_login_user() {
+  debug_log "Determining login user"
+  if [[ -z "$login_user" ]]; then
+    if [[ "$registry" == "ghcr" && -n "$GITHUB_USER" ]]; then 
+      login_user="$GITHUB_USER"
+    fi
+  fi
+}
+
 # Login before any registry probing
 login() {
   debug_log "Authenticating to $registry_host"
@@ -152,9 +146,9 @@ get_image_candidates() {
     branch=$(get_current_branch)
     debug_log "current branch=$branch"
     if [[ -n "$branch" ]]; then
-      image=("${repo,,}-$branch" "${repo,,}")
+      image=("$image_base-$branch" "$image_base")
     else
-      image=("${repo,,}")
+      image=("$image_base")
     fi
     debug_log "candidates=${image[*]}"
   fi
@@ -169,10 +163,10 @@ get_current_branch() {
   fi
 }
 
-sif_filename_from_uri() {
+filename_from_uri() {
   debug_log "Deriving SIF filename from $1"
   local sel_uri="$1" base br part
-  base="${2,,}"
+  base="$2"
   br=$(get_current_branch)
   part=${sel_uri#*://*/}; part=${part%%:*}; part=${part##*/}
   if [[ "$part" == "$base-$br" ]]; then
@@ -200,20 +194,21 @@ get_dir() {
 
 build_apptainer() {
   debug_log "Starting build_apptainer for $1"
-  local uri="$1" dir_arg="$2" sif="${3:-}"
+  local uri="$1" sif="${2:-}"
   echo "Building Apptainer image '$sif' from Docker image '$uri'"
-  local digest out_dir
-  out_dir=$(get_dir "$dir_arg")
+  local out_dir
+  out_dir=$(get_dir)
   apptainer build ${force:+--force} "$out_dir/$sif" "$uri"
   echo "Completed: $sif"
 }
 
 main() {
   parse_args "$@"
-  log_args
   ensure_prerequisites
-  validate_required_params
   get_hostname
+  get_owner
+  get_login_user
+  log_args
   get_ghcr_token
   login
   get_image_candidates
@@ -222,15 +217,14 @@ main() {
   # Try each image candidate in turn; the first one that builds wins
   local success=0
   for cand in "${image[@]}"; do
-    src_org=$(determine_org); src_org="${src_org,,}"
-    uri="docker://$registry_host/$src_org/$cand:$tag"
+    uri="docker://$registry_host/$owner/$cand:$tag"
     # derive the sif filename for this URI
-    sif_candidate=$(sif_filename_from_uri "$uri" "$repo")
+    sif_candidate=$(filename_from_uri "$uri" "$image_base")
     echo "Attempting to build from: $uri → $sif_candidate"
 
     # disable errexit so we can catch failures
     set +e
-    build_apptainer "$uri" "$dir_base" "$sif_candidate"
+    build_apptainer "$uri" "$sif_candidate"
     rc=$?
     set -e
 
@@ -243,7 +237,7 @@ main() {
   done
 
   if [[ $success -eq 0 ]]; then
-    die "No matching image could be pulled for $(determine_org)/$repo:$tag"
+    die "No matching image could be pulled"
   fi
   echo "Successfully built SIF: $sif_candidate"
 }
