@@ -11,15 +11,15 @@ die() {
 usage() {
   cat <<EOF
 Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i <images>] [-t <tag>] [-s <sif>] [-d <dir_base>] [-f] [-D]
-  -R, --registry   Registry to pull from ('docker' or 'ghcr'; defaults to 'ghcr')
+  -R, --registry   Registry ('docker' or 'ghcr'; defaults to 'ghcr')
   -u, --user       Username for login (required for private images)
-  -o, --org        Organisation or owner override (defaults to repo remote owner)
-  -p, --password   Password or token (GHCR reads GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT if unset)
-  -r, --repo       Repository name (defaults to current directory basename)
+  -o, --org        Org/owner override (defaults to Git remote owner)
+  -p, --password   Password/token (GHCR reads GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT if unset)
+  -r, --repo       Repo name (defaults to current directory basename)
   -i, --image      Image name(s), comma-separated (defaults to <repo>-<branch>, then <repo>)
   -s, --sif        SIF filename (with or without .sif)
   -t, --tag        Tag (defaults to 'latest')
-  -d, --dir_base   Directory for storing the SIF (defaults to cache dirs)
+  -d, --dir_base   Directory to store SIF (defaults to cache dirs)
   -f, --force      Force download & overwrite existing SIF
   -D, --debug      Enable debug output
   -h, --help       Show this help and exit
@@ -27,19 +27,16 @@ EOF
   exit 1
 }
 
+# turn on optional debug
 enable_debug() {
-  if [[ "$debug" == true ]]; then
-    set -x
-  fi
+  [[ "$debug" == true ]] && set -x
 }
 
 debug_log() {
-  if [[ "$debug" == true ]]; then
-    printf '[DEBUG] %s\n' "$*" >&2
-  fi
+  [[ "$debug" == true ]] && printf '[DEBUG] %s\n' "$*" >&2
 }
 
-# Determine org/user from args or git remote
+# Determine org/user from args or Git remote
 determine_org() {
   if [[ -n "$org" ]]; then
     echo "$org"
@@ -56,6 +53,7 @@ determine_org() {
   fi
 }
 
+# Ensure required commands exist
 ensure_prerequisites() {
   debug_log "Running ensure_prerequisites"
   for cmd in curl git apptainer jq; do
@@ -78,6 +76,7 @@ login_user=""
 password=""
 debug=false
 
+# Parse CLI args
 parse_args() {
   debug_log "Parsing arguments: $*"
   while [[ $# -gt 0 ]]; do
@@ -109,9 +108,9 @@ validate_required_params() {
 get_hostname() {
   debug_log "Determining registry host for $registry"
   case "$registry" in
-    docker) registry_host="docker.io" ;; 
-    ghcr)   registry_host="ghcr.io" ;; 
-    *) die "Unsupported registry '$registry'" ;; 
+    docker) registry_host="docker.io";;
+    ghcr)   registry_host="ghcr.io";;
+    *) die "Unsupported registry '$registry'";;
   esac
   debug_log "registry_host=$registry_host"
 }
@@ -121,6 +120,16 @@ get_ghcr_token() {
   if [[ "$registry" == "ghcr" && -z "$password" ]]; then
     password="${GH_TOKEN:-${GITHUB_TOKEN:-${GITHUB_PAT:-}}}"
     debug_log "GHCR token ${password:+retrieved}";
+  fi
+}
+
+# Login before any registry probing
+login() {
+  debug_log "Authenticating to $registry_host"
+  if [[ -n "$login_user" && -n "$password" ]]; then
+    echo "$password" | apptainer registry login -u "$login_user" --password-stdin "docker://$registry_host"
+  else
+    debug_log "Skipping registry login (no credentials)"
   fi
 }
 
@@ -142,7 +151,7 @@ get_image_candidates() {
 get_current_branch() {
   debug_log "Fetching current Git branch"
   if git rev-parse --is-inside-work-tree &>/dev/null && git symbolic-ref --quiet HEAD &>/dev/null; then
-    git symbolic-ref --short HEAD | tr '/\\.' '_' | tr '[:upper:]' '[:lower:]'
+    git symbolic-ref --short HEAD | tr '/\.' '_' | tr '[:upper:]' '[:lower:]'
   else
     echo ""
   fi
@@ -171,32 +180,23 @@ choose_image() {
 image_exists() {
   debug_log "Checking existence of $1"
   local uri="$1" host repo_tag repo tag status auth_opts url
-
   host=${uri#docker://}; host=${host%%/*}
   repo_tag=${uri#docker://$host/}
   repo=${repo_tag%:*}
   tag=${repo_tag##*:}
-
   auth_opts=()
   if [[ -n "$login_user" && -n "$password" ]]; then
     auth_opts=(-u "$login_user:$password")
   fi
-
   url="https://$host/v2/$repo/manifests/$tag"
   debug_log "HEAD $url with opts: ${auth_opts[*]}"
-
-  status=$(curl -sSLI -o /dev/null -w '%{http_code}' \
-    "${auth_opts[@]}" \
-    -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-    "$url"
-  )
+  status=$(curl -sSLI -o /dev/null -w '%{http_code}' "${auth_opts[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "$url")
   debug_log "Manifest check HTTP/$status for $repo:$tag"
-
   case "$status" in
-    200) return 0 ;;   # exists
-    401) die "401 Unauthorized—check your credentials" ;;
-    404) return 1 ;;   # not found
-    *)   die "Registry returned $status for $repo:$tag" ;;
+    200) return 0;;
+    401) die "401 Unauthorized—check your credentials";;
+    404) return 1;;
+    *) die "Registry returned $status for $repo:$tag";;
   esac
 }
 
@@ -206,26 +206,38 @@ sif_filename_from_uri() {
   base="${2,,}"
   br=$(get_current_branch)
   part=${sel_uri#*://*/}; part=${part%%:*}; part=${part##*/}
-  if [[ "$part" == "$base-$br" ]]; then echo "$part.sif"; else echo "$base.sif"; fi
+  if [[ "$part" == "$base-$br" ]]; then
+    echo "$part.sif"
+  else
+    echo "$base.sif"
+  fi
 }
 
 get_dir() {
   debug_log "Computing output directory"
   local d
-  if [[ -n "$dir_base" ]]; then d="$dir_base"
-  elif [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then d="$APPTAINER_CACHE_DIR"
-  elif [[ -d "/scratch/$USER" ]]; then d="/scratch/$USER/.local/share/apptainer/sif"
-  else d="$HOME/.local/share/apptainer/sif"; fi
-  mkdir -p "$d"; echo "$d"
+  if [[ -n "$dir_base" ]]; then
+    d="$dir_base"
+  elif [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then
+    d="$APPTAINER_CACHE_DIR"
+  elif [[ -d "/scratch/$USER" ]]; then
+    d="/scratch/$USER/.local/share/apptainer/sif"
+  else
+    d="$HOME/.local/share/apptainer/sif"
+  fi
+  mkdir -p "$d"
+  echo "$d"
 }
 
-login() {
-  debug_log "Authenticating to $registry_host"
-  if [[ -n "$login_user" && -n "$password" ]]; then
-    echo "$password" | apptainer registry login -u "$login_user" --password-stdin "docker://$registry_host"
-  else
-    debug_log "Skipping registry login (no credentials)"
-  fi
+build_apptainer() {
+  debug_log "Starting build_apptainer for $1"
+  local uri="$1" dir_arg="$2" sif="${3:-}"
+  echo "Building Apptainer image '$sif' from Docker image '$uri'"
+  local digest out_dir
+  digest=$(get_docker_digest "$uri")
+  out_dir=$(get_dir "$dir_arg")
+  apptainer build ${force:+--force} --label "docker.source.digest=$digest" "$out_dir/$sif" "$uri"
+  echo "Completed: $sif"
 }
 
 get_docker_digest() {
@@ -243,17 +255,6 @@ get_docker_digest() {
   echo "$digest"
 }
 
-build_apptainer() {
-  debug_log "Starting build_apptainer for $1"
-  local uri="$1" dir_arg="$2" sif="${3:-}"
-  echo "Building Apptainer image '$sif' from Docker image '$uri'"
-  local digest out_dir
-  digest=$(get_docker_digest "$uri")
-  out_dir=$(get_dir "$dir_arg")
-  apptainer build ${force:+--force} --label "docker.source.digest=$digest" "$out_dir/$sif" "$uri"
-  echo "Completed: $sif"
-}
-
 main() {
   enable_debug
   ensure_prerequisites
@@ -263,18 +264,14 @@ main() {
   get_ghcr_token
   login
   get_image_candidates
-
   debug_log "Image candidates: ${image[*]}"
   selected_uri=$(choose_image) || die "No matching image for $(determine_org)/$repo:$tag"
   echo "Found container image: $selected_uri"
-
-  if ! $sif_specified; then
-    sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
-  fi
+  [[ "$sif_specified" == true ]] || sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
   echo "Will use SIF file: $sif_file"
-
-  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0; fi
-
+  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then
+    echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0
+  fi
   build_apptainer "$selected_uri" "$dir_base" "$sif_file"
 }
 
