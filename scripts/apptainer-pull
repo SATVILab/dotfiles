@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Requires Bash ≥ 4.0
+
 set -euo pipefail
 
 usage() {
@@ -21,7 +23,7 @@ EOF
 
 ensure_prerequisites() {
   for cmd in curl git apptainer jq; do
-    command -v $cmd >/dev/null || {
+    command -v "$cmd" >/dev/null || {
       echo "Error: '$cmd' not found; please install it." >&2
       exit 1
     }
