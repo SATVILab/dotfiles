@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: $0 -R <registry> -u <user> -o <org> -p <password> -r <repo> [-t <tag>] [-s <sif_name>] [-d <dir_base>] [-f]
+Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i <images>] [-t <tag>] [-s <sif>] [-d <dir_base>] [-f]
   -R, --registry   Registry to pull from ('docker' or 'ghcr'; defaults to 'ghcr')
   -u, --user       Username for GitHub or Docker (required)
   -o, --org        Organisation or user override (defaults to \$login_user)
@@ -19,22 +19,23 @@ EOF
   exit 1
 }
 
-ensure_jq() {
-  command -v jq >/dev/null || {
-    echo "Error: jq is required to extract manifest digests." >&2
-    exit 1
-  }
+ensure_prerequisites() {
+  for cmd in curl git apptainer jq; do
+    command -v $cmd >/dev/null || {
+      echo "Error: '$cmd' not found; please install it." >&2
+      exit 1
+    }
+  done
 }
 
 # ——— Defaults —————————————————
 sif_specified=false
 sif_file=""
-branch="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
 # image may be either string or array
 image=()
 tag="latest"
 tag_set=false
-force=false
+force=""
 dir_base=""
 registry="ghcr"
 org=""
@@ -70,7 +71,7 @@ parse_args() {
         shift 2
         ;;
       -f|--force)
-        force=true
+        force="--force"
         shift
         ;;
       -h|--help)
@@ -111,8 +112,28 @@ get_ghcr_token() {
 
 # Populate image array if user passed a single string or nothing
 get_image_candidates() {
-  if [[ ${#image[@]} -eq 0 ]]; then
-    image=( "${repo,,}-${branch,,}" "${repo,,}" )
+  if (( ${#image[@]} == 0 )); then
+    local branch
+    branch="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
+
+    if [[ -n "$branch" ]]; then
+      # in a git repo: try repo-branch then repo
+      image=( "${repo,,}-${branch}" "${repo,,}" )
+    else
+      # not in repo: just use repo
+      image=( "${repo,,}" )
+    fi
+  fi
+}
+
+get_current_branch() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null \
+     || ! git symbolic-ref --quiet HEAD &>/dev/null; then
+    echo ""
+  else
+    git symbolic-ref --short HEAD \
+      | tr '/\.' '_' \
+      | tr '[:upper:]' '[:lower:]'
   fi
 }
 
@@ -157,7 +178,7 @@ image_exists() {
 sif_filename_from_uri() {
   local sel_uri="$1" base_repo br repo_part
   base_repo="${2,,}"
-  br="${3,,}"
+  br="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
   repo_part="${sel_uri#*://*/}"    # strip scheme & host => org/repo:tag
   repo_part="${repo_part%%:*}"     # org/repo
   repo_part="${repo_part##*/}"     # repo
@@ -254,7 +275,7 @@ build_apptainer() {
 }
 
 main() {
-  ensure_jq
+  ensure_prerequisites
   parse_args "$@"
   validate_required_params
   get_hostname
@@ -270,12 +291,12 @@ main() {
 
   # 2. sif filename
   if ! $sif_specified; then
-    sif_file="$(sif_filename_from_uri "$selected_uri" "$repo" "$branch")"
+    sif_file="$(sif_filename_from_uri "$selected_uri" "$repo")"
   fi
   echo "Will use SIF file: $sif_file"
 
   # 4. existing SIF?
-  if [[ "$force" != true ]] && apptainer-exists -q -s "$sif_file"; then
+  if [[ -z "$force" ]] && apptainer-exists -q -s "$sif_file"; then
     echo "SIF '$sif_file' already present (use --force to overwrite)."
     exit 0
   fi
