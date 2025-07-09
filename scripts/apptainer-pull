@@ -40,7 +40,6 @@ debug_log() {
 }
 
 # Determine org/user from args or git remote
-
 determine_org() {
   if [[ -n "$org" ]]; then
     echo "$org"
@@ -57,8 +56,6 @@ determine_org() {
   fi
 }
 
-# Ensure required commands exist
-
 ensure_prerequisites() {
   debug_log "Running ensure_prerequisites"
   for cmd in curl git apptainer jq; do
@@ -66,7 +63,7 @@ ensure_prerequisites() {
   done
 }
 
-# ——— Defaults —————————————————
+# Defaults
 sif_specified=false
 sif_file=""
 image=()
@@ -112,9 +109,9 @@ validate_required_params() {
 get_hostname() {
   debug_log "Determining registry host for $registry"
   case "$registry" in
-    docker) registry_host="docker.io" ;;
-    ghcr)   registry_host="ghcr.io" ;;
-    *) die "Unsupported registry '$registry'" ;;
+    docker) registry_host="docker.io" ;; 
+    ghcr)   registry_host="ghcr.io" ;; 
+    *) die "Unsupported registry '$registry'" ;; 
   esac
   debug_log "registry_host=$registry_host"
 }
@@ -151,34 +148,37 @@ get_current_branch() {
   fi
 }
 
-choose_image() {
-  debug_log "Choosing image from candidates"
-  local src_org cand uri
-  src_org=$(determine_org)
-  debug_log "using org/user=$src_org"
-  src_org="${src_org,,}"
-  for cand in "${image[@]}"; do
-    uri="docker://$registry_host/$src_org/$cand:$tag"
-    debug_log "testing $uri"
-    if image_exists "$uri"; then
-      debug_log "chosen $uri"
-      echo "$uri"
-      return 0
-    fi
-  done
-  return 1
-}
-
+# Use basic auth and HEAD probe for existence
 image_exists() {
   debug_log "Checking existence of $1"
-  local uri="$1" host repo_tag repo tag
+  local uri="$1" host repo_tag repo tag status auth_opts url
+
   host=${uri#docker://}; host=${host%%/*}
   repo_tag=${uri#docker://$host/}
   repo=${repo_tag%:*}
   tag=${repo_tag##*:}
-  local auth_header=()
-  [[ -n "$password" ]] && auth_header=(-H "Authorization: Bearer $password")
-  curl --fail -sSL -H "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json" "${auth_header[@]}" "https://$host/v2/$repo/manifests/$tag" >/dev/null 2>&1
+
+  auth_opts=()
+  if [[ -n "$login_user" && -n "$password" ]]; then
+    auth_opts=(-u "$login_user:$password")
+  fi
+
+  url="https://$host/v2/$repo/manifests/$tag"
+  debug_log "HEAD $url with opts: ${auth_opts[*]}"
+
+  status=$(curl -sSLI -o /dev/null -w '%{http_code}' \
+    "${auth_opts[@]}" \
+    -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+    "$url"
+  )
+  debug_log "Manifest check HTTP/$status for $repo:$tag"
+
+  case "$status" in
+    200) return 0 ;;   # exists
+    401) die "401 Unauthorized—check your credentials" ;;
+    404) return 1 ;;   # not found
+    *)   die "Registry returned $status for $repo:$tag" ;;
+  esac
 }
 
 sif_filename_from_uri() {
@@ -188,50 +188,40 @@ sif_filename_from_uri() {
   br=$(get_current_branch)
   part=${sel_uri#*://*/}; part=${part%%:*}; part=${part##*/}
   if [[ "$part" == "$base-$br" ]]; then
-    echo "$part.sif"
-  else
-    echo "$base.sif"
-  fi
+    echo "$part.sif" else echo "$base.sif"; fi
 }
 
 get_dir() {
   debug_log "Computing output directory"
   local d
-  if [[ -n "$dir_base" ]]; then
-    d="$dir_base"
-  elif [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then
-    d="$APPTAINER_CACHE_DIR"
-  elif [[ -d "/scratch/$USER" ]]; then
-    d="/scratch/$USER/.local/share/apptainer/sif"
-  else
-    d="$HOME/.local/share/apptainer/sif"
-  fi
-  mkdir -p "$d"
-  echo "$d"
+  if [[ -n "$dir_base" ]]; then d="$dir_base"
+  elif [[ -n "${APPTAINER_CACHE_DIR:-}" ]]; then d="$APPTAINER_CACHE_DIR"
+  elif [[ -d "/scratch/$USER" ]]; then d="/scratch/$USER/.local/share/apptainer/sif"
+  else d="$HOME/.local/share/apptainer/sif"; fi
+  mkdir -p "$d"; echo "$d"
 }
 
 login() {
-  debug_log "Logging into registry if credentials provided"
-  if [[ -n "$password" && -n "$login_user" ]]; then
-    echo "Logging into $registry_host as $login_user"
+  debug_log "Authenticating to $registry_host"
+  if [[ -n "$login_user" && -n "$password" ]]; then
     echo "$password" | apptainer registry login -u "$login_user" --password-stdin "docker://$registry_host"
   else
-    echo "Skipping registry login (no credentials)"
+    debug_log "Skipping registry login (no credentials)"
   fi
 }
 
 get_docker_digest() {
   debug_log "Fetching Docker digest for $1"
-  local uri="$1" host repo_tag repo tag manifest digest auth_header
+  local uri="$1" host repo_tag repo tag manifest digest auth_opts url
   host=${uri#docker://}; host=${host%%/*}
   repo_tag=${uri#docker://$host/}
   repo=${repo_tag%:*}
   tag=${repo_tag##*:}
-  auth_header=()
-  [[ -n "$password" ]] && auth_header=(-H "Authorization: Bearer $password")
-  manifest=$(curl -sSL "${auth_header[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://$host/v2/$repo/manifests/$tag")
+  auth_opts=() && [[ -n "$login_user" && -n "$password" ]] && auth_opts=(-u "$login_user:$password")
+  url="https://$host/v2/$repo/manifests/$tag"
+  manifest=$(curl -sSL "${auth_opts[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "$url")
   digest=$(jq -r '.config.digest // empty' <<<"$manifest")
-  [[ -n "$digest" ]] || { die "Could not extract digest for $uri"; }
+  [[ -n "$digest" ]] || die "Could not extract digest for $uri"
   echo "$digest"
 }
 
@@ -253,23 +243,22 @@ main() {
   validate_required_params
   get_hostname
   get_ghcr_token
+  login
   get_image_candidates
 
   debug_log "Image candidates: ${image[*]}"
   selected_uri=$(choose_image) || die "No matching image for $(determine_org)/$repo:$tag"
   echo "Found container image: $selected_uri"
 
-  if ! $sif_specified; then
+  if ! \$sif_specified; then
     sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
   fi
   echo "Will use SIF file: $sif_file"
 
   if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then
-    echo "SIF '$sif_file' already present (use --force to overwrite)."
-    exit 0
+    echo "SIF '$sif_file' already present (use --force to overwrite)."; exit 0
   fi
 
-  login
   build_apptainer "$selected_uri" "$dir_base" "$sif_file"
 }
 
