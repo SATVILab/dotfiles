@@ -3,15 +3,20 @@
 
 set -euo pipefail
 
+die() {
+  printf '[ERROR] %s\n' "$*" >&2
+  exit 1
+}
+
 usage() {
   cat <<EOF
 Usage: $0 [-R <registry>] (-u <user> | -o <org>) [-p <password>] [-r <repo>] [-i <images>] [-t <tag>] [-s <sif>] [-d <dir_base>] [-f] [-D]
   -R, --registry   Registry to pull from ('docker' or 'ghcr'; defaults to 'ghcr')
-  -u, --user       Username for GitHub or Docker (required)
-  -o, --org        Organisation or user override (defaults to \$login_user)
-  -p, --password   Password or token (for GHCR defaults to GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT)
+  -u, --user       Username for login (required for private images)
+  -o, --org        Organisation or owner override (defaults to repo remote owner)
+  -p, --password   Password or token (GHCR reads GH_TOKEN, GITHUB_TOKEN or GITHUB_PAT if unset)
   -r, --repo       Repository name (defaults to current directory basename)
-  -i, --image      Image name (string or array; defaults to <repo>-<branch>, then <repo>)
+  -i, --image      Image name(s), comma‑separated (defaults to <repo>-<branch>, then <repo>)
   -s, --sif        SIF filename (with or without .sif)
   -t, --tag        Tag (defaults to 'latest')
   -d, --dir_base   Directory for storing the SIF (defaults to cache dirs)
@@ -34,13 +39,30 @@ debug_log() {
   fi
 }
 
+# Determine org/user from args or git remote
+
+determine_org() {
+  if [[ -n "$org" ]]; then
+    echo "$org"
+  elif [[ -n "$login_user" ]]; then
+    echo "$login_user"
+  else
+    local remote
+    remote=$(git config --get remote.origin.url 2>/dev/null) || remote=""
+    if [[ "$remote" =~ github\.com[:/]+([^/]+)/ ]]; then
+      echo "${BASH_REMATCH[1]}"
+    else
+      die "Cannot determine org/user from git remote; please specify -u or -o."
+    fi
+  fi
+}
+
+# Ensure required commands exist
+
 ensure_prerequisites() {
   debug_log "Running ensure_prerequisites"
   for cmd in curl git apptainer jq; do
-    command -v "$cmd" >/dev/null || {
-      echo "Error: '$cmd' not found; please install it." >&2
-      exit 1
-    }
+    command -v "$cmd" >/dev/null || die "'$cmd' not found; please install it."
   done
 }
 
@@ -63,44 +85,37 @@ parse_args() {
   debug_log "Parsing arguments: $*"
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -R|--registry) registry="$2"; debug_log "Set registry=$registry"; shift 2;;
-      -u|--user)     login_user="$2"; debug_log "Set login_user=$login_user"; shift 2;;
-      -o|--org)      org="$2"; debug_log "Set org=$org"; shift 2;;
-      -p|--password) password="$2"; debug_log "Password provided"; shift 2;;
-      -r|--repo)     repo="$2"; debug_log "Set repo=$repo"; shift 2;;
-      -i|--image)    IFS=, read -r -a image <<<"$2"; debug_log "Set image candidates=${image[*]}"; shift 2;;
-      -s|--sif)      sif_specified=true; sif_file="${2%.sif}.sif"; debug_log "SIF specified: $sif_file"; shift 2;;
-      -t|--tag)      tag="$2"; tag_set=true; debug_log "Set tag=$tag"; shift 2;;
-      -d|--dir_base) dir_base="$2"; debug_log "Set dir_base=$dir_base"; shift 2;;
-      -f|--force)    force="--force"; debug_log "Force enabled"; shift;;
-      -D|--debug)    debug=true; debug_log "Debug mode on"; shift;;
+      -R|--registry) registry="$2"; debug_log "registry=$registry"; shift 2;;
+      -u|--user)     login_user="$2"; debug_log "login_user=$login_user"; shift 2;;
+      -o|--org)      org="$2"; debug_log "org=$org"; shift 2;;
+      -p|--password) password="$2"; debug_log "password set"; shift 2;;
+      -r|--repo)     repo="$2"; debug_log "repo=$repo"; shift 2;;
+      -i|--image)    IFS=, read -r -a image <<<"$2"; debug_log "images=${image[*]}"; shift 2;;
+      -s|--sif)      sif_specified=true; sif_file="${2%.sif}.sif"; debug_log "sif_file=$sif_file"; shift 2;;
+      -t|--tag)      tag="$2"; tag_set=true; debug_log "tag=$tag"; shift 2;;
+      -d|--dir_base) dir_base="$2"; debug_log "dir_base=$dir_base"; shift 2;;
+      -f|--force)    force="--force"; debug_log "force enabled"; shift;;
+      -D|--debug)    debug=true; debug_log "debug mode on"; shift;;
       -h|--help)     usage;;
-      *)
-        echo "Unknown option: $1" >&2
-        usage
-        ;;
+      *) die "Unknown option: $1";;
     esac
   done
 }
 
 validate_required_params() {
   debug_log "Validating required parameters"
-  if [[ -z "$login_user" && -z "$org" ]]; then
-    echo "Error: either --user or --org must be specified." >&2
+  if [[ -z "${login_user}${org}" ]]; then
     usage
   fi
 }
 
 get_hostname() {
   debug_log "Determining registry host for $registry"
-  if [[ "$registry" == "docker" ]]; then
-    registry_host="docker.io"
-  elif [[ "$registry" == "ghcr" ]]; then
-    registry_host="ghcr.io"
-  else
-    echo "Error: Unsupported registry '$registry'" >&2
-    exit 1
-  fi
+  case "$registry" in
+    docker) registry_host="docker.io" ;;
+    ghcr)   registry_host="ghcr.io" ;;
+    *) die "Unsupported registry '$registry'" ;;
+  esac
   debug_log "registry_host=$registry_host"
 }
 
@@ -116,36 +131,37 @@ get_image_candidates() {
   debug_log "Generating image candidates"
   if (( ${#image[@]} == 0 )); then
     local branch
-    branch="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
-    debug_log "Current branch: $branch"
+    branch=$(get_current_branch)
+    debug_log "current branch=$branch"
     if [[ -n "$branch" ]]; then
-      image=( "${repo,,}-$branch" "${repo,,}" )
+      image=("${repo,,}-$branch" "${repo,,}")
     else
-      image=( "${repo,,}" )
+      image=("${repo,,}")
     fi
-    debug_log "Candidates: ${image[*]}"
+    debug_log "candidates=${image[*]}"
   fi
 }
 
 get_current_branch() {
   debug_log "Fetching current Git branch"
-  if ! git rev-parse --is-inside-work-tree &>/dev/null || ! git symbolic-ref --quiet HEAD &>/dev/null; then
-    echo ""
-  else
+  if git rev-parse --is-inside-work-tree &>/dev/null && git symbolic-ref --quiet HEAD &>/dev/null; then
     git symbolic-ref --short HEAD | tr '/\\.' '_' | tr '[:upper:]' '[:lower:]'
+  else
+    echo ""
   fi
 }
 
 choose_image() {
   debug_log "Choosing image from candidates"
-  local src_org="${org:-$login_user}"
+  local src_org cand uri
+  src_org=$(determine_org)
+  debug_log "using org/user=$src_org"
   src_org="${src_org,,}"
-  local cand uri
   for cand in "${image[@]}"; do
     uri="docker://$registry_host/$src_org/$cand:$tag"
-    debug_log "Testing $uri"
+    debug_log "testing $uri"
     if image_exists "$uri"; then
-      debug_log "Chosen $uri"
+      debug_log "chosen $uri"
       echo "$uri"
       return 0
     fi
@@ -155,23 +171,26 @@ choose_image() {
 
 image_exists() {
   debug_log "Checking existence of $1"
-  local uri="$1" h p_t p t auth_header
-  h="${uri#docker://}"; h="${h%%/*}"
-  p_t="${uri#docker://$h/}"; p="${p_t%:*}"; t="${p_t##*:}"
-  auth_header=(); [[ -n "$password" ]] && auth_header=( -H "Authorization: Bearer $password" )
-  curl --fail -sSL -H "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json" "${auth_header[@]}" "https://$h/v2/$p/manifests/$t" >/dev/null 2>&1
+  local uri="$1" host repo_tag repo tag
+  host=${uri#docker://}; host=${host%%/*}
+  repo_tag=${uri#docker://$host/}
+  repo=${repo_tag%:*}
+  tag=${repo_tag##*:}
+  local auth_header=()
+  [[ -n "$password" ]] && auth_header=(-H "Authorization: Bearer $password")
+  curl --fail -sSL -H "Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json" "${auth_header[@]}" "https://$host/v2/$repo/manifests/$tag" >/dev/null 2>&1
 }
 
 sif_filename_from_uri() {
   debug_log "Deriving SIF filename from $1"
-  local sel_uri="$1" base_repo br repo_part
-  base_repo="${2,,}"
-  br="$(get_current_branch | tr '[:upper:]' '[:lower:]')"
-  repo_part="${sel_uri#*://*/}"; repo_part="${repo_part%%:*}"; repo_part="${repo_part##*/}"
-  if [[ "$repo_part" == "$base_repo-$br" ]]; then
-    echo "${repo_part}.sif"
+  local sel_uri="$1" base br part
+  base="${2,,}"
+  br=$(get_current_branch)
+  part=${sel_uri#*://*/}; part=${part%%:*}; part=${part##*/}
+  if [[ "$part" == "$base-$br" ]]; then
+    echo "$part.sif"
   else
-    echo "${base_repo}.sif"
+    echo "$base.sif"
   fi
 }
 
@@ -203,27 +222,28 @@ login() {
 
 get_docker_digest() {
   debug_log "Fetching Docker digest for $1"
-  local uri="$1" host path_tag path tag manifest digest auth_header
-  host="${uri#docker://}"; host="${host%%/*}"
-  path_tag="${uri#docker://$host/}"; path="${path_tag%:*}"; tag="${path_tag##*:}"
-  auth_header=(); [[ -n "$password" ]] && auth_header=( -H "Authorization: Bearer $password" )
-  manifest="$(curl -sSL "${auth_header[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://$host/v2/$path/manifests/$tag")"
-  digest="$(jq -r '.config.digest // empty' <<<"$manifest")"
-  if [[ -z "$digest" ]]; then
-    echo "Error: could not extract digest for $uri" >&2
-    return 1
-  fi
+  local uri="$1" host repo_tag repo tag manifest digest auth_header
+  host=${uri#docker://}; host=${host%%/*}
+  repo_tag=${uri#docker://$host/}
+  repo=${repo_tag%:*}
+  tag=${repo_tag##*:}
+  auth_header=()
+  [[ -n "$password" ]] && auth_header=(-H "Authorization: Bearer $password")
+  manifest=$(curl -sSL "${auth_header[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://$host/v2/$repo/manifests/$tag")
+  digest=$(jq -r '.config.digest // empty' <<<"$manifest")
+  [[ -n "$digest" ]] || { die "Could not extract digest for $uri"; }
   echo "$digest"
 }
 
 build_apptainer() {
   debug_log "Starting build_apptainer for $1"
-  local sel_uri="$1" dir_base_arg="${2:-}" sif_file="$3" out_dir digest
-  echo "Building Apptainer image '$sif_file' from Docker image '$sel_uri'"
-  digest="$(get_docker_digest "$sel_uri")" || { echo "Failed to fetch digest, aborting." >&2; exit 1; }
-  out_dir=$(get_dir "$dir_base_arg"); mkdir -p "$out_dir"
-  apptainer build ${force:+--force} --label "docker.source.digest=$digest" "$out_dir/$sif_file" "$sel_uri"
-  echo "Completed: $sif_file"
+  local uri="$1" dir_arg="$2" sif="${3:-}"
+  echo "Building Apptainer image '$sif' from Docker image '$uri'"
+  local digest out_dir
+  digest=$(get_docker_digest "$uri")
+  out_dir=$(get_dir "$dir_arg")
+  apptainer build ${force:+--force} --label "docker.source.digest=$digest" "$out_dir/$sif" "$uri"
+  echo "Completed: $sif"
 }
 
 main() {
@@ -235,19 +255,16 @@ main() {
   get_ghcr_token
   get_image_candidates
 
-  debug_log "Selecting image..."
-  if ! selected_uri="$(choose_image)"; then
-    echo "Error: no matching image for ${org:-$login_user}/$repo:$tag" >&2
-    exit 1
-  fi
+  debug_log "Image candidates: ${image[*]}"
+  selected_uri=$(choose_image) || die "No matching image for $(determine_org)/$repo:$tag"
   echo "Found container image: $selected_uri"
 
-  if ! \$sif_specified; then
-    sif_file="$(sif_filename_from_uri "$selected_uri" "$repo")"
+  if ! $sif_specified; then
+    sif_file=$(sif_filename_from_uri "$selected_uri" "$repo")
   fi
   echo "Will use SIF file: $sif_file"
 
-  if [[ -z "$force" ]] && apptainer-exists -q -s "$sif_file"; then
+  if [[ -z "$force" && -f "$(get_dir)/$sif_file" ]]; then
     echo "SIF '$sif_file' already present (use --force to overwrite)."
     exit 0
   fi
