@@ -208,25 +208,9 @@ build_apptainer() {
   local uri="$1" dir_arg="$2" sif="${3:-}"
   echo "Building Apptainer image '$sif' from Docker image '$uri'"
   local digest out_dir
-  digest=$(get_docker_digest "$uri")
   out_dir=$(get_dir "$dir_arg")
-  apptainer build ${force:+--force} --label "docker.source.digest=$digest" "$out_dir/$sif" "$uri"
+  apptainer build ${force:+--force} "$out_dir/$sif" "$uri"
   echo "Completed: $sif"
-}
-
-get_docker_digest() {
-  debug_log "Fetching Docker digest for $1"
-  local uri="$1" host repo_tag repo tag manifest digest auth_opts url
-  host=${uri#docker://}; host=${host%%/*}
-  repo_tag=${uri#docker://$host/}
-  repo=${repo_tag%:*}
-  tag=${repo_tag##*:}
-  auth_opts=() && [[ -n "$login_user" && -n "$password" ]] && auth_opts=(-u "$login_user:$password")
-  url="https://$host/v2/$repo/manifests/$tag"
-  manifest=$(curl -sSL "${auth_opts[@]}" -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "$url")
-  digest=$(jq -r '.config.digest // empty' <<<"$manifest")
-  [[ -n "$digest" ]] || die "Could not extract digest for $uri"
-  echo "$digest"
 }
 
 main() {
