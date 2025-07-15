@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ——— Defaults —————————————————
-sif_specified=false
+file_specified=false
 sif_file=""
 directory=""
 candidates=()
@@ -9,9 +9,9 @@ base_dirs=()
 
 usage() {
   cat<<EOF
-Usage: $0 [-s <sif>] [-d <directory>]
-  -s, --sif        Explicit SIF filename (with or without .sif)
-  -d, --directory  Directory to search first (skips cache dirs)
+Usage: $0 [-f <file>] [-d <directory>]
+  -f, --file       SIF filename (with or without .sif)
+  -d, --directory  Directory to search (skips cache dirs)
   -h, --help       Show this help and exit
 EOF
   exit 1
@@ -20,8 +20,8 @@ EOF
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -s|--sif)
-        sif_specified=true
+      -f|--file)
+        file_specified=true
         sif_file="${2%.sif}.sif"
         shift 2
         ;;
@@ -59,7 +59,7 @@ get_default_candidates() {
 }
 
 get_candidates() {
-  if $sif_specified; then
+  if $file_specified; then
     candidates=( "$sif_file" )
   else
     mapfile -t candidates < <(get_default_candidates)

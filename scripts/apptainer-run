@@ -3,8 +3,8 @@ set -euo pipefail
 
 usage() {
   cat<<EOF
-Usage: $0 [-s <sif>] [-d <directory>] [-q] [--] [<command>...]
-  -s, --sif        Explicit SIF filename (with or without .sif)
+Usage: $0 [-f <file>] [-d <directory>] [-q] [--] [<command>...]
+  -f, --file       Explicit SIF filename (with or without .sif)
   -d, --directory  Directory to search first (skips cache dirs)
   -q, --quiet      No output; just exit 0 if SIF found, 1 otherwise
   -h, --help       Show this help and exit
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
   fi
 
   case $1 in
-    -s|--sif)
+    -f|--file)
       args_for_path+=(--sif "$2")
       shift 2
       ;;

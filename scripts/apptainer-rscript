@@ -3,13 +3,14 @@ set -euo pipefail
 
 usage() {
   cat <<EOF
-Usage: $0 [-s <sif>] [-d <directory>] [-n] -- <R expression>
-  -s, --sif           : Explicit SIF filename (with or without .sif)
-  -d, --directory     : Directory to search first (skips cache dirs)
-  -h, --help          : Show this help and exit
-  <R expression>      : The R code to run (passed to Rscript -e). Use single quotes
-                        : to avoid shell expansion issues. If no expression is given,
-                        : an interactive R shell will be opened.
+Usage: $0 [-f <file>] [-d <directory>] [-q] -- <R expression>
+  -f, --file        Explicit SIF filename (with or without .sif)
+  -d, --directory   Directory to search first (skips cache dirs)
+  -q, --quiet       No output; just exit 0 if no expression
+  -h, --help        Show this help and exit
+
+Everything after “--” (or the first non-flag) is treated as an R expression
+and passed to Rscript -e. If no expression is given, the script exits.
 EOF
   exit 1
 }
@@ -28,7 +29,8 @@ while [[ $# -gt 0 ]]; do
   fi
 
   case $1 in
-    -s|--sif)
+    -f|--file)
+      # map our -f/--file into apptainer-path’s --sif
       args_for_path+=(--sif "$2")
       shift 2
       ;;
@@ -76,10 +78,8 @@ if (( ${#custom_command[@]} )); then
   [[ $quiet != true ]] && \
     echo "Running inside container: Rscript -e \"$expr\""
 
-  # exec so we replace this script with the container process
   exec apptainer exec "$sif_path" Rscript -e "$expr"
 else
-  # no R expression? drop to shell
-  [[ $quiet != true ]] && echo "No command given"
+  [[ $quiet != true ]] && echo "No R expression given; exiting."
   exit 1
 fi
